@@ -2,7 +2,7 @@
   "expo": {
     "name": "EduPath",
     "slug": "edupath",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -10,12 +10,22 @@
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
+    "plugins": [
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf"
+          ]
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "package": "com.edupath.lk",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1E1B4B"
