@@ -25,6 +25,7 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
+      "apiUrl": "https://education-path-kohl.vercel.app/api",
       "eas": {
         "projectId": "adfa75c4-07d6-4bde-a68e-18a48318522c"
       }

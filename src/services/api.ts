@@ -8,26 +8,14 @@ import { NAITA_VERIFIED_COURSES } from '../data/naitaData';
 import { ALL_VERIFIED_UNIFIED_COURSES, cleanImageUrl } from '../data/allUnifiedCourses';
 import { markCourseAsDeleted, isCourseDeleted } from '../utils/liveDataSync';
 
-// Dynamic host determination: supports Android Studio Emulator, physical Expo Go devices over Wi-Fi, and Web/iOS
+// 24/7 Production Backend deployed on Vercel connected to MongoDB Atlas
+const LIVE_PRODUCTION_API_URL = 'https://education-path-kohl.vercel.app/api';
+
 const getBackendBaseUrl = (): string => {
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-  if (Platform.OS === 'web') {
-    return 'http://localhost:5001/api';
-  }
-  const hostUri = Constants.expoConfig?.hostUri || (Constants as any).manifest?.debuggerHost;
-  if (hostUri) {
-    const ip = hostUri.split(':')[0];
-    if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
-      return `http://${ip}:5001/api`;
-    }
-  }
-  if (Platform.OS === 'android') {
-    // 192.168.221.143 connects physical devices on the same Wi-Fi. (Emulator can also use 10.0.2.2)
-    return 'http://192.168.221.143:5001/api';
-  }
-  return 'http://localhost:5001/api';
+  return LIVE_PRODUCTION_API_URL;
 };
 
 // Map NAITA course to unified Course type
