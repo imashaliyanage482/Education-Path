@@ -32,6 +32,7 @@ import {
   NAITAProviderFilter,
 } from '../types';
 import { NAITACourseCard } from '../components/naita/NAITACourseCard';
+import { DropdownSelect, DropdownOption } from '../components/common/DropdownSelect';
 import { useTranslation } from '../context/LanguageContext';
 import { useLiveCourses } from '../hooks/useLiveCourses';
 import { syncInstitutionCourses } from '../utils/liveDataSync';
@@ -43,14 +44,12 @@ interface NAITACoursesScreenProps {
 export const NAITACoursesScreen: React.FC<NAITACoursesScreenProps> = ({ navigation }) => {
   const { isSinhala } = useTranslation();
 
-  // Search & Filter States
+  // Search & Filter States (Default to null - No Auto-Fill)
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedQual, setSelectedQual] = useState<NAITAQualificationFilter>('All Qualifications');
-  const [selectedNVQ, setSelectedNVQ] = useState<NAITANVQFilter>('All Levels');
-  const [selectedProvider, setSelectedProvider] = useState<NAITAProviderFilter>('All Providers');
+  const [selectedNVQ, setSelectedNVQ] = useState<string | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedDistrict, setSelectedDistrict] = useState<string>('All Districts');
-  const [showDistrictModal, setShowDistrictModal] = useState(false);
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
   const [selectedCourseDetails, setSelectedCourseDetails] = useState<NAITACourse | null>(null);
 
   const liveCourses = useLiveCourses();
@@ -58,49 +57,75 @@ export const NAITACoursesScreen: React.FC<NAITACoursesScreenProps> = ({ navigati
     return syncInstitutionCourses('NAITA', NAITA_VERIFIED_COURSES, liveCourses);
   }, [liveCourses]);
 
-  // Filter Logic: Combined 5-Facet Filtering
+  // Dropdown Options strictly tailored for NAITA
+  const naitaCategoryOptions: DropdownOption[] = useMemo(() => {
+    return NAITA_CATEGORIES.map((cat) => ({
+      value: cat.name,
+      label: cat.name,
+      labelSi: cat.nameSi,
+    }));
+  }, []);
+
+  const naitaProviderOptions: DropdownOption[] = useMemo(() => {
+    return NAITA_PROVIDER_FILTERS.filter((p) => p.id !== 'All Providers').map((p) => ({
+      value: p.id,
+      label: p.label,
+      labelSi: p.labelSi,
+    }));
+  }, []);
+
+  const naitaNvqOptions: DropdownOption[] = useMemo(() => {
+    return [
+      { value: 'NVQ Level 3', label: 'NVQ Level 3 (National Certificate)', labelSi: 'NVQ මට්ටම 3 (ජාතික සහතිකය)' },
+      { value: 'NVQ Level 4', label: 'NVQ Level 4 (National Certificate)', labelSi: 'NVQ මට්ටම 4 (ජාතික සහතිකය)' },
+      { value: 'NVQ Level 5', label: 'NVQ Level 5 (National Diploma)', labelSi: 'NVQ මට්ටම 5 (ජාතික ඩිප්ලෝමා)' },
+      { value: 'NVQ Level 6', label: 'NVQ Level 6 (NDES / Higher Diploma)', labelSi: 'NVQ මට්ටම 6 (NDES / උසස් ඩිප්ලෝමා)' },
+    ];
+  }, []);
+
+  const naitaDistrictOptions: DropdownOption[] = useMemo(() => {
+    return NAITA_DISTRICTS.filter((d) => d !== 'All Districts').map((d) => ({
+      value: d,
+      label: d,
+    }));
+  }, []);
+
+  // Filter Logic: Strictly NAITA-relevant
   const filteredCourses = useMemo(() => {
     return naitaCourses.filter((course) => {
       // 1. Search Query Match
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         q.length === 0 ||
-        course.name.toLowerCase().includes(q) ||
-        (course.sinhalaName && course.sinhalaName.toLowerCase().includes(q)) ||
-        (course.code && course.code.toLowerCase().includes(q)) ||
-        course.category.toLowerCase().includes(q) ||
-        course.trainingCentre.toLowerCase().includes(q);
+        Boolean(course.name && course.name.toLowerCase().includes(q)) ||
+        Boolean(course.sinhalaName && course.sinhalaName.toLowerCase().includes(q)) ||
+        Boolean(course.code && course.code.toLowerCase().includes(q)) ||
+        Boolean(course.category && course.category.toLowerCase().includes(q)) ||
+        Boolean(course.trainingCentre && course.trainingCentre.toLowerCase().includes(q));
 
-      // 2. Qualification Type Match
-      let matchesQual = true;
-      if (selectedQual !== 'All Qualifications') {
-        matchesQual = course.qualificationType === selectedQual;
-      }
-
-      // 3. NVQ Level Match
+      // 2. NVQ Level Match
       let matchesNVQ = true;
-      if (selectedNVQ !== 'All Levels') {
-        matchesNVQ = course.nvqLevel.includes(selectedNVQ);
+      if (selectedNVQ) {
+        matchesNVQ = Boolean(course.nvqLevel && course.nvqLevel.includes(selectedNVQ));
       }
 
-      // 4. Provider Match
+      // 3. Provider Match
       let matchesProvider = true;
-      if (selectedProvider !== 'All Providers') {
-        matchesProvider = course.providerType === selectedProvider;
+      if (selectedProvider) {
+        matchesProvider = Boolean(course.providerType && course.providerType === selectedProvider);
       }
 
-      // 5. Category Match
+      // 4. Category Match
       let matchesCategory = true;
       if (selectedCategory) {
-        matchesCategory = course.category === selectedCategory;
+        matchesCategory = Boolean(course.category && course.category === selectedCategory);
       }
 
-      // 6. District Match
+      // 5. District Match
       let matchesDistrict = true;
-      if (selectedDistrict !== 'All Districts') {
+      if (selectedDistrict) {
         matchesDistrict =
-          course.district.includes(selectedDistrict) ||
-          course.district.includes('All') ||
+          Boolean(course.district && (course.district.includes(selectedDistrict) || course.district.includes('All'))) ||
           Boolean(
             course.availableDistricts &&
               (course.availableDistricts.includes(selectedDistrict) ||
@@ -110,7 +135,6 @@ export const NAITACoursesScreen: React.FC<NAITACoursesScreenProps> = ({ navigati
 
       return (
         matchesSearch &&
-        matchesQual &&
         matchesNVQ &&
         matchesProvider &&
         matchesCategory &&
@@ -120,7 +144,6 @@ export const NAITACoursesScreen: React.FC<NAITACoursesScreenProps> = ({ navigati
   }, [
     naitaCourses,
     searchQuery,
-    selectedQual,
     selectedNVQ,
     selectedProvider,
     selectedCategory,
@@ -129,19 +152,17 @@ export const NAITACoursesScreen: React.FC<NAITACoursesScreenProps> = ({ navigati
 
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
-    selectedQual !== 'All Qualifications' ||
-    selectedNVQ !== 'All Levels' ||
-    selectedProvider !== 'All Providers' ||
+    selectedNVQ !== null ||
+    selectedProvider !== null ||
     selectedCategory !== null ||
-    selectedDistrict !== 'All Districts';
+    selectedDistrict !== null;
 
   const handleClearFilters = () => {
     setSearchQuery('');
-    setSelectedQual('All Qualifications');
-    setSelectedNVQ('All Levels');
-    setSelectedProvider('All Providers');
+    setSelectedNVQ(null);
+    setSelectedProvider(null);
     setSelectedCategory(null);
-    setSelectedDistrict('All Districts');
+    setSelectedDistrict(null);
   };
 
   return (
@@ -230,157 +251,72 @@ export const NAITACoursesScreen: React.FC<NAITACoursesScreenProps> = ({ navigati
           </View>
         </View>
 
-        {/* 3. Combined Filter 1: Qualification Types (Instruction 4 & 11) */}
-        <View style={styles.filterGroup}>
-          <Text style={styles.filterGroupLabel}>
-            {isSinhala ? '1. සුදුසුකම් කාණ්ඩය' : '1. Qualification Type'}
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPillsRow}>
-            {NAITA_QUALIFICATION_FILTERS.map((qual) => {
-              const isSelected = selectedQual === qual.id;
-              return (
-                <TouchableOpacity
-                  key={qual.id}
-                  style={[styles.filterPill, isSelected && styles.filterPillActive]}
-                  onPress={() => setSelectedQual(qual.id)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.filterPillText, isSelected && styles.filterPillTextActive]}>
-                    {isSinhala ? qual.labelSi : qual.label} ({qual.count})
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Informative notice if HND or Degree is selected (Instruction 5 & 9) */}
-        {(selectedQual === 'HND' || selectedQual === 'Degree') && (
-          <View style={styles.qualificationNoticeBox}>
-            <Ionicons name="information-circle" size={20} color={COLORS.modernBlue} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.qualificationNoticeTitle}>
-                {selectedQual === 'Degree'
-                  ? isSinhala
-                    ? 'උපාධි පාඨමාලා පිළිබඳ නිල සටහන'
-                    : 'Official Note on Degree Programmes'
-                  : isSinhala
-                  ? 'HND පාඨමාලා පිළිබඳ නිල සටහන'
-                  : 'Official Note on Higher National Diplomas (HND)'}
-              </Text>
-              <Text style={styles.qualificationNoticeText}>
-                {selectedQual === 'Degree'
-                  ? isSinhala
-                    ? 'NAITA යනු ශ්‍රී ලංකා රජයේ ප්‍රමුඛතම වෘත්තීය හා ආධුනිකත්ව අධිකාරිය වන අතර සෘජුවම උපාධි පිරිනමන්නේ නැත. වෘත්තීය උපාධි සඳහා University of Vocational Technology (UoVT) වෙත යොමුවන්න.'
-                    : 'NAITA is Sri Lanka’s apex apprenticeship authority up to NVQ Level 6 (NDES). NAITA does not directly award university degrees. For TVET Bachelor’s degrees, see University of Vocational Technology (UoVT).'
-                  : isSinhala
-                  ? 'Higher National Diploma (HND) පාඨමාලා ශ්‍රී ලංකා උසස් තාක්ෂණ අධ්‍යාපන ආයතනය (SLIATE) මගින් පිරිනමනු ලැබේ.'
-                  : 'Higher National Diploma (HND) programmes are conducted by the Sri Lanka Institute of Advanced Technological Education (SLIATE).'}
+        {/* 3. NAITA Dropdown Filters (No Auto-Fill, Institution-specific) */}
+        <View style={styles.dropdownFiltersContainer}>
+          <View style={styles.filterHeaderRow}>
+            <View style={styles.filterTitleRow}>
+              <Ionicons name="options-outline" size={16} color={COLORS.primaryPurple} />
+              <Text style={styles.filterSectionTitle}>
+                {isSinhala ? 'NAITA පාඨමාලා පෙරහන' : 'Filter NAITA Courses'}
               </Text>
             </View>
-          </View>
-        )}
-
-        {/* 4. Combined Filter 2: NVQ Level (Instruction 4 & 11) */}
-        <View style={styles.filterGroup}>
-          <Text style={styles.filterGroupLabel}>
-            {isSinhala ? '2. NVQ මට්ටම (Levels 1–7)' : '2. NVQ Level (Levels 1–7)'}
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPillsRow}>
-            {NAITA_NVQ_FILTERS.map((nvq) => {
-              const isSelected = selectedNVQ === nvq.id;
-              return (
-                <TouchableOpacity
-                  key={nvq.id}
-                  style={[styles.filterPill, isSelected && styles.filterPillActive]}
-                  onPress={() => setSelectedNVQ(nvq.id)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.filterPillText, isSelected && styles.filterPillTextActive]}>
-                    {nvq.label} ({nvq.count})
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* 5. Combined Filter 3: Training Provider (Instruction 7) */}
-        <View style={styles.filterGroup}>
-          <Text style={styles.filterGroupLabel}>
-            {isSinhala ? '3. පුහුණු ආයතනය / මධ්‍යස්ථානය' : '3. Training Provider (Direct vs. Specialized Institutes)'}
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPillsRow}>
-            {NAITA_PROVIDER_FILTERS.map((provider) => {
-              const isSelected = selectedProvider === provider.id;
-              return (
-                <TouchableOpacity
-                  key={provider.id}
-                  style={[styles.filterPill, isSelected && styles.filterPillActive]}
-                  onPress={() => setSelectedProvider(provider.id)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.filterPillText, isSelected && styles.filterPillTextActive]}>
-                    {isSinhala ? provider.labelSi : provider.label} ({provider.count})
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* 6. Combined Filter 4: Sector / Category (11 Official Sectors) */}
-        <View style={styles.filterGroup}>
-          <View style={styles.filterHeaderRow}>
-            <Text style={styles.filterGroupLabel}>
-              {isSinhala ? '4. ක්ෂේත්‍රය (Official Sectors - 11)' : '4. Course Sector (11 Official Sectors)'}
-            </Text>
-            {selectedCategory && (
-              <TouchableOpacity onPress={() => setSelectedCategory(null)}>
-                <Text style={styles.resetLink}>{isSinhala ? 'සියලු ක්ෂේත්‍ර' : 'Show All Sectors'}</Text>
+            {hasActiveFilters && (
+              <TouchableOpacity onPress={handleClearFilters} style={styles.clearBtn} activeOpacity={0.7}>
+                <Ionicons name="refresh" size={13} color={COLORS.danger} style={{ marginRight: 3 }} />
+                <Text style={styles.clearBtnText}>
+                  {isSinhala ? 'ඉවත් කරන්න' : 'Reset Filters'}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPillsRow}>
-            {NAITA_CATEGORIES.map((cat) => {
-              const isSelected = selectedCategory === cat.name;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.sectorCard, isSelected && styles.sectorCardActive]}
-                  onPress={() => setSelectedCategory(isSelected ? null : cat.name)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name={cat.icon as any}
-                    size={16}
-                    color={isSelected ? COLORS.white : COLORS.primaryPurple}
-                  />
-                  <Text style={[styles.sectorCardText, isSelected && styles.sectorCardTextActive]} numberOfLines={1}>
-                    {isSinhala ? cat.nameSi : cat.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
 
-        {/* 7. Combined Filter 5: District Filter Button */}
-        <View style={styles.districtRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.districtLabel}>{isSinhala ? '5. දිස්ත්‍රික්කය:' : '5. District:'}</Text>
-            <Text style={styles.districtValue}>{selectedDistrict}</Text>
+          {/* Trade Sector Dropdown */}
+          <DropdownSelect
+            label={isSinhala ? 'වෘත්තීය ක්ෂේත්‍රය (Trade Sector)' : 'Trade Sector'}
+            placeholder={isSinhala ? 'සියලු ක්ෂේත්‍ර (Select Sector)' : 'All Sectors (Select Sector)'}
+            selectedValue={selectedCategory}
+            onSelect={setSelectedCategory}
+            options={naitaCategoryOptions}
+            iconName="construct-outline"
+            isSinhala={isSinhala}
+          />
+
+          {/* Training Provider Dropdown */}
+          <DropdownSelect
+            label={isSinhala ? 'පුහුණු ආයතනය / මධ්‍යස්ථානය' : 'Training Institute / Centre'}
+            placeholder={isSinhala ? 'සියලු මධ්‍යස්ථාන (Select Centre)' : 'All Centres (Select Centre)'}
+            selectedValue={selectedProvider}
+            onSelect={setSelectedProvider}
+            options={naitaProviderOptions}
+            iconName="business-outline"
+            isSinhala={isSinhala}
+          />
+
+          {/* 2-Column: NVQ Level + District */}
+          <View style={styles.dropdownTwoColRow}>
+            <View style={{ flex: 1, marginRight: 6 }}>
+              <DropdownSelect
+                label={isSinhala ? 'NVQ මට්ටම' : 'NVQ Level'}
+                placeholder={isSinhala ? 'සියලු මට්ටම්' : 'All Levels'}
+                selectedValue={selectedNVQ}
+                onSelect={setSelectedNVQ}
+                options={naitaNvqOptions}
+                iconName="ribbon-outline"
+                isSinhala={isSinhala}
+              />
+            </View>
+            <View style={{ flex: 1, marginLeft: 6 }}>
+              <DropdownSelect
+                label={isSinhala ? 'දිස්ත්‍රික්කය' : 'District'}
+                placeholder={isSinhala ? 'සියලු දිස්ත්‍රික්ක' : 'All Districts'}
+                selectedValue={selectedDistrict}
+                onSelect={setSelectedDistrict}
+                options={naitaDistrictOptions}
+                iconName="location-outline"
+                isSinhala={isSinhala}
+              />
+            </View>
           </View>
-          <TouchableOpacity
-            style={styles.changeDistrictBtn}
-            onPress={() => setShowDistrictModal(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="location" size={14} color={COLORS.primaryPurple} />
-            <Text style={styles.changeDistrictBtnText}>
-              {isSinhala ? 'දිස්ත්‍රික්කය මාරු කරන්න' : 'Select District'}
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* Active Filters Summary & Reset */}
@@ -432,43 +368,6 @@ export const NAITACoursesScreen: React.FC<NAITACoursesScreenProps> = ({ navigati
 
         <View style={{ height: 40 }} />
       </ScrollView>
-
-      {/* District Selection Modal */}
-      <Modal visible={showDistrictModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.districtModalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {isSinhala ? 'දිස්ත්‍රික්කය තෝරන්න' : 'Select Training District'}
-              </Text>
-              <TouchableOpacity onPress={() => setShowDistrictModal(false)}>
-                <Ionicons name="close" size={24} color={COLORS.darkNavy} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 380 }}>
-              {NAITA_DISTRICTS.map((d) => (
-                <TouchableOpacity
-                  key={d}
-                  style={[styles.districtOption, selectedDistrict === d && styles.districtOptionActive]}
-                  onPress={() => {
-                    setSelectedDistrict(d);
-                    setShowDistrictModal(false);
-                  }}
-                >
-                  <Text
-                    style={[styles.districtOptionText, selectedDistrict === d && styles.districtOptionTextActive]}
-                  >
-                    {d}
-                  </Text>
-                  {selectedDistrict === d && (
-                    <Ionicons name="checkmark-circle" size={18} color={COLORS.primaryPurple} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
       {/* Course Full Details Modal */}
       {selectedCourseDetails && (
@@ -726,14 +625,53 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.darkNavy,
   },
-  filterGroup: {
-    marginBottom: 10,
+  dropdownFiltersContainer: {
+    marginBottom: 14,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
   },
   filterHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  filterTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  filterSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.darkNavy,
+  },
+  clearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  clearBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.danger,
+  },
+  dropdownTwoColRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  filterGroup: {
+    marginBottom: 10,
   },
   filterGroupLabel: {
     fontSize: 12,

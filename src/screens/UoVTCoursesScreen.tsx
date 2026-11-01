@@ -18,6 +18,7 @@ import { COLORS } from '../constants/colors';
 import { Header } from '../components/common/Header';
 import { Badge } from '../components/common/Badge';
 import { UoVTCourseCard } from '../components/uovt/UoVTCourseCard';
+import { DropdownSelect, DropdownOption } from '../components/common/DropdownSelect';
 import { useLiveCourses } from '../hooks/useLiveCourses';
 import { syncInstitutionCourses } from '../utils/liveDataSync';
 import {
@@ -46,14 +47,51 @@ export const UoVTCoursesScreen: React.FC<UoVTCoursesScreenProps> = ({ navigation
   // Active Screen Tab: Programmes vs University Colleges
   const [activeTab, setActiveTab] = useState<'programmes' | 'colleges'>('programmes');
 
-  // Search & Filter States
+  // Search & Filter States (Default to null - No Auto-Fill)
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<UoVTSubjectCategory | null>(null);
-  const [selectedFaculty, setSelectedFaculty] = useState<string>('All Faculties');
-  const [selectedNVQLevel, setSelectedNVQLevel] = useState<string>('All Levels');
-  const [selectedDegreeType, setSelectedDegreeType] = useState<string>('All Qualifications');
-  const [selectedStudyMode, setSelectedStudyMode] = useState<string>('All Modes');
-  const [selectedCampus, setSelectedCampus] = useState<string>('All Locations');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedFaculty, setSelectedFaculty] = useState<string | null>(null);
+  const [selectedNVQLevel, setSelectedNVQLevel] = useState<string | null>(null);
+  const [selectedStudyMode, setSelectedStudyMode] = useState<string | null>(null);
+  const [selectedCampus, setSelectedCampus] = useState<string | null>(null);
+
+  // Dropdown Options strictly for UoVT
+  const uovtCategoryOptions: DropdownOption[] = useMemo(() => {
+    return UOVT_SUBJECT_CATEGORIES.map((cat) => ({
+      value: cat.name,
+      label: cat.name,
+      labelSi: cat.nameSi,
+    }));
+  }, []);
+
+  const uovtFacultyOptions: DropdownOption[] = useMemo(() => {
+    return UOVT_FACULTIES.map((fac) => ({
+      value: fac,
+      label: fac,
+    }));
+  }, []);
+
+  const uovtNvqOptions: DropdownOption[] = useMemo(() => {
+    return [
+      { value: 'NVQ Level 7', label: 'NVQ Level 7 (Bachelor Degree)', labelSi: 'NVQ මට්ටම 7 (උපාධි පාඨමාලා)' },
+      { value: 'NVQ Level 6', label: 'NVQ Level 6 (Higher Diploma)', labelSi: 'NVQ මට්ටම 6 (උසස් ඩිප්ලෝමා)' },
+      { value: 'NVQ Level 5', label: 'NVQ Level 5 (National Diploma)', labelSi: 'NVQ මට්ටම 5 (ඩිප්ලෝමා)' },
+    ];
+  }, []);
+
+  const uovtStudyModeOptions: DropdownOption[] = useMemo(() => {
+    return [
+      { value: 'Weekday', label: 'Weekday (Full-time)', labelSi: 'සතියේ දින (සම්පූර්ණ කාලීන)' },
+      { value: 'Weekend', label: 'Weekend (Part-time)', labelSi: 'සති අන්ත (අර්ධ කාලීන)' },
+    ];
+  }, []);
+
+  const uovtCampusOptions: DropdownOption[] = useMemo(() => {
+    return [
+      { value: 'Main Campus', label: 'Main Campus (Ratmalana)', labelSi: 'ප්‍රධාන මණ්ඩපය (රත්මලාන)' },
+      { value: 'University College', label: 'Affiliated University Colleges (6)', labelSi: 'අනුබද්ධ විශ්වවිද්‍යාල විද්‍යාල (6)' },
+    ];
+  }, []);
 
   // Modal Details State
   const [selectedProgramme, setSelectedProgramme] = useState<UoVTProgramme | null>(null);
@@ -81,70 +119,44 @@ export const UoVTCoursesScreen: React.FC<UoVTCoursesScreenProps> = ({ navigation
       // 1. Search Query
       const matchesSearch =
         q.length === 0 ||
-        prog.name.toLowerCase().includes(q) ||
-        (prog.sinhalaName && prog.sinhalaName.toLowerCase().includes(q)) ||
-        (prog.code && prog.code.toLowerCase().includes(q)) ||
-        prog.subjectCategory.toLowerCase().includes(q) ||
-        prog.faculty.toLowerCase().includes(q) ||
-        prog.description.toLowerCase().includes(q);
+        Boolean(prog.name && prog.name.toLowerCase().includes(q)) ||
+        Boolean(prog.sinhalaName && prog.sinhalaName.toLowerCase().includes(q)) ||
+        Boolean(prog.code && prog.code.toLowerCase().includes(q)) ||
+        Boolean(prog.subjectCategory && prog.subjectCategory.toLowerCase().includes(q)) ||
+        Boolean(prog.faculty && prog.faculty.toLowerCase().includes(q)) ||
+        Boolean(prog.description && prog.description.toLowerCase().includes(q));
 
       // 2. Subject Category Filter
       const matchesCategory = selectedCategory ? prog.subjectCategory === selectedCategory : true;
 
       // 3. Faculty Filter
-      const matchesFaculty =
-        selectedFaculty === 'All Faculties' ? true : prog.faculty === selectedFaculty;
+      const matchesFaculty = selectedFaculty ? prog.faculty === selectedFaculty : true;
 
       // 4. NVQ Level Filter
       let matchesNVQ = true;
-      if (selectedNVQLevel !== 'All Levels') {
-        if (selectedNVQLevel.includes('Level 7') || selectedNVQLevel.includes('Degree')) {
-          matchesNVQ = prog.nvqLevel.includes('Level 7') || prog.qualificationType.includes('Degree');
-        } else if (selectedNVQLevel.includes('Level 6')) {
-          matchesNVQ =
-            prog.nvqLevel.includes('Level 6') ||
-            Boolean(prog.supportedLevels && prog.supportedLevels.includes('NVQ Level 6'));
-        } else if (selectedNVQLevel.includes('Level 5')) {
-          matchesNVQ =
-            prog.nvqLevel.includes('Level 5') ||
-            Boolean(prog.supportedLevels && prog.supportedLevels.includes('NVQ Level 5'));
-        } else {
-          // Entry requirement levels (1 to 4)
-          matchesNVQ =
-            prog.entryRequirements.toLowerCase().includes(selectedNVQLevel.toLowerCase()) ||
-            Boolean(
-              prog.acceptedPriorQualifications &&
-                prog.acceptedPriorQualifications.some((pq) =>
-                  pq.toLowerCase().includes(selectedNVQLevel.toLowerCase())
-                )
-            );
-        }
+      if (selectedNVQLevel) {
+        matchesNVQ = Boolean(
+          (prog.nvqLevel && prog.nvqLevel.includes(selectedNVQLevel)) ||
+          (prog.supportedLevels && prog.supportedLevels.some((lvl) => lvl && lvl.includes(selectedNVQLevel))) ||
+          (prog.qualificationType && prog.qualificationType.includes(selectedNVQLevel))
+        );
       }
 
-      // 5. Degree / Qualification Type Filter
-      let matchesDegree = true;
-      if (selectedDegreeType !== 'All Qualifications') {
-        matchesDegree =
-          prog.qualificationType.includes(selectedDegreeType) ||
-          Boolean(prog.degreeType && prog.degreeType.includes(selectedDegreeType));
-      }
-
-      // 6. Study Mode Filter
+      // 5. Study Mode Filter
       let matchesMode = true;
-      if (selectedStudyMode !== 'All Modes') {
-        matchesMode =
-          prog.studyMode.includes('Both') ||
-          (selectedStudyMode.includes('Weekday') && prog.studyMode.includes('Weekday')) ||
-          (selectedStudyMode.includes('Weekend') && prog.studyMode.includes('Weekend'));
+      if (selectedStudyMode) {
+        const sm = prog.studyMode || 'Weekday';
+        matchesMode = sm.toLowerCase().includes(selectedStudyMode.toLowerCase()) || sm.includes('Both');
       }
 
-      // 7. Campus / Location Filter
+      // 6. Campus / Location Filter
       let matchesCampus = true;
-      if (selectedCampus !== 'All Locations') {
-        matchesCampus =
-          selectedCampus.includes('Main Campus')
-            ? prog.campus.includes('Main Campus') || prog.campus.includes('Both')
-            : prog.campus.includes('University Colleges') || prog.campus.includes('Both');
+      if (selectedCampus) {
+        if (selectedCampus.includes('Main Campus')) {
+          matchesCampus = Boolean(prog.campus && (prog.campus.includes('Main Campus') || prog.campus.includes('Both')));
+        } else if (selectedCampus.includes('University College')) {
+          matchesCampus = Boolean(prog.campus && (prog.campus.includes('University Colleges') || prog.campus.includes('Both')));
+        }
       }
 
       return (
@@ -152,7 +164,6 @@ export const UoVTCoursesScreen: React.FC<UoVTCoursesScreenProps> = ({ navigation
         matchesCategory &&
         matchesFaculty &&
         matchesNVQ &&
-        matchesDegree &&
         matchesMode &&
         matchesCampus
       );
@@ -163,7 +174,6 @@ export const UoVTCoursesScreen: React.FC<UoVTCoursesScreenProps> = ({ navigation
     selectedCategory,
     selectedFaculty,
     selectedNVQLevel,
-    selectedDegreeType,
     selectedStudyMode,
     selectedCampus,
   ]);
@@ -171,20 +181,18 @@ export const UoVTCoursesScreen: React.FC<UoVTCoursesScreenProps> = ({ navigation
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
     selectedCategory !== null ||
-    selectedFaculty !== 'All Faculties' ||
-    selectedNVQLevel !== 'All Levels' ||
-    selectedDegreeType !== 'All Qualifications' ||
-    selectedStudyMode !== 'All Modes' ||
-    selectedCampus !== 'All Locations';
+    selectedFaculty !== null ||
+    selectedNVQLevel !== null ||
+    selectedStudyMode !== null ||
+    selectedCampus !== null;
 
   const handleClearFilters = () => {
     setSearchQuery('');
     setSelectedCategory(null);
-    setSelectedFaculty('All Faculties');
-    setSelectedNVQLevel('All Levels');
-    setSelectedDegreeType('All Qualifications');
-    setSelectedStudyMode('All Modes');
-    setSelectedCampus('All Locations');
+    setSelectedFaculty(null);
+    setSelectedNVQLevel(null);
+    setSelectedStudyMode(null);
+    setSelectedCampus(null);
   };
 
   // Active level detail derivation for open modal
@@ -343,197 +351,83 @@ export const UoVTCoursesScreen: React.FC<UoVTCoursesScreenProps> = ({ navigation
               </View>
             </View>
 
-            {/* 4. Subject Categories Horizontal Filter (ONE MAIN CARD PER SUBJECT CATEGORY) */}
-            <View style={styles.categoryFilterSection}>
-              <Text style={styles.filterSectionTitle}>
-                {isSinhala ? 'විෂය ක්ෂේත්‍රය (Subject Category)' : 'Subject Categories'}
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryPillsScroll}
-              >
-                {/* All Categories Option */}
-                <TouchableOpacity
-                  style={[styles.categoryPill, selectedCategory === null && styles.categoryPillActive]}
-                  onPress={() => setSelectedCategory(null)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name="grid-outline"
-                    size={14}
-                    color={selectedCategory === null ? COLORS.white : COLORS.primaryPurple}
-                  />
-                  <Text
-                    style={[
-                      styles.categoryPillText,
-                      selectedCategory === null && styles.categoryPillTextActive,
-                    ]}
-                  >
-                    {isSinhala ? 'සියලු විෂය ක්ෂේත්‍ර (8)' : 'All Categories (8)'}
-                  </Text>
-                </TouchableOpacity>
-
-                {/* 8 UoVT Categories */}
-                {UOVT_SUBJECT_CATEGORIES.map((cat) => {
-                  const isSelected = selectedCategory === cat.name;
-                  return (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[styles.categoryPill, isSelected && styles.categoryPillActive]}
-                      onPress={() => setSelectedCategory(isSelected ? null : cat.name)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={cat.iconName as any}
-                        size={14}
-                        color={isSelected ? COLORS.white : COLORS.primaryPurple}
-                      />
-                      <Text
-                        style={[styles.categoryPillText, isSelected && styles.categoryPillTextActive]}
-                      >
-                        {isSinhala && cat.nameSi ? cat.nameSi : cat.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            {/* 5. NVQ Level Filter Section */}
-            <View style={styles.filterSection}>
+            {/* 4. UoVT Dropdown Filters (No Auto-Fill, Strictly UoVT-specific) */}
+            <View style={styles.dropdownFiltersContainer}>
               <View style={styles.filterHeaderRow}>
                 <View style={styles.filterTitleRow}>
-                  <Ionicons name="funnel-outline" size={16} color={COLORS.primaryPurple} />
-                  <Text style={styles.filterSubLabel}>
-                    {isSinhala ? 'NVQ මට්ටම් පෙරහන' : 'NVQ Level Filter'}
+                  <Ionicons name="options-outline" size={16} color={COLORS.primaryPurple} />
+                  <Text style={styles.filterSectionTitle}>
+                    {isSinhala ? 'UoVT උපාධි පාඨමාලා පෙරහන' : 'Filter UoVT Programmes'}
                   </Text>
                 </View>
                 {hasActiveFilters && (
                   <TouchableOpacity onPress={handleClearFilters} style={styles.clearBtn} activeOpacity={0.7}>
-                    <Ionicons name="refresh" size={12} color={COLORS.danger} style={{ marginRight: 3 }} />
+                    <Ionicons name="refresh" size={13} color={COLORS.danger} style={{ marginRight: 3 }} />
                     <Text style={styles.clearBtnText}>
-                      {isSinhala ? 'ෆිල්ටර ඉවත් කරන්න' : 'Clear Filters'}
+                      {isSinhala ? 'ඉවත් කරන්න' : 'Reset Filters'}
                     </Text>
                   </TouchableOpacity>
                 )}
               </View>
 
-              {/* NVQ Horizontal Selector */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.nvqScrollList}
-              >
-                {UOVT_NVQ_FILTERS.map((level) => {
-                  const isSelected = selectedNVQLevel === level;
-                  return (
-                    <TouchableOpacity
-                      key={level}
-                      style={[styles.nvqPill, isSelected && styles.nvqPillSelected]}
-                      onPress={() => setSelectedNVQLevel(level)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.nvqPillText, isSelected && styles.nvqPillTextSelected]}>
-                        {level}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+              {/* Subject Category Dropdown */}
+              <DropdownSelect
+                label={isSinhala ? 'විෂය ක්ෂේත්‍රය (Subject Category)' : 'Subject Category'}
+                placeholder={isSinhala ? 'සියලු ක්ෂේත්‍ර (Select Category)' : 'All Categories (Select Category)'}
+                selectedValue={selectedCategory}
+                onSelect={setSelectedCategory}
+                options={uovtCategoryOptions}
+                iconName="laptop-outline"
+                isSinhala={isSinhala}
+              />
 
-              {/* Faculty Horizontal Filter */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[styles.nvqScrollList, { marginTop: 8 }]}
-              >
-                {['All Faculties', ...UOVT_FACULTIES].map((fac) => {
-                  const isSelected = selectedFaculty === fac;
-                  const shortFac = fac.replace('Faculty of ', '');
-                  return (
-                    <TouchableOpacity
-                      key={fac}
-                      style={[styles.districtPill, isSelected && styles.districtPillSelected]}
-                      onPress={() => setSelectedFaculty(fac)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name="school-outline"
-                        size={12}
-                        color={isSelected ? COLORS.white : COLORS.secondaryText}
-                      />
-                      <Text
-                        style={[
-                          styles.districtPillText,
-                          isSelected && styles.districtPillTextSelected,
-                        ]}
-                      >
-                        {shortFac}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+              {/* Faculty Dropdown */}
+              <DropdownSelect
+                label={isSinhala ? 'පීඨය (Faculty)' : 'Faculty'}
+                placeholder={isSinhala ? 'සියලු පීඨ (Select Faculty)' : 'All Faculties (Select Faculty)'}
+                selectedValue={selectedFaculty}
+                onSelect={setSelectedFaculty}
+                options={uovtFacultyOptions}
+                iconName="school-outline"
+                isSinhala={isSinhala}
+              />
 
-              {/* Study Mode & Campus Horizontal Filters */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[styles.nvqScrollList, { marginTop: 8 }]}
-              >
-                {UOVT_STUDY_MODE_FILTERS.map((mode) => {
-                  const isSelected = selectedStudyMode === mode;
-                  return (
-                    <TouchableOpacity
-                      key={mode}
-                      style={[styles.districtPill, isSelected && styles.districtPillSelected]}
-                      onPress={() => setSelectedStudyMode(mode)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name="calendar-outline"
-                        size={12}
-                        color={isSelected ? COLORS.white : COLORS.secondaryText}
-                      />
-                      <Text
-                        style={[
-                          styles.districtPillText,
-                          isSelected && styles.districtPillTextSelected,
-                        ]}
-                      >
-                        {mode}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+              {/* 2-Column: NVQ Level + Study Mode */}
+              <View style={styles.dropdownTwoColRow}>
+                <View style={{ flex: 1, marginRight: 6 }}>
+                  <DropdownSelect
+                    label={isSinhala ? 'NVQ මට්ටම' : 'NVQ Level'}
+                    placeholder={isSinhala ? 'සියලු මට්ටම්' : 'All Levels'}
+                    selectedValue={selectedNVQLevel}
+                    onSelect={setSelectedNVQLevel}
+                    options={uovtNvqOptions}
+                    iconName="ribbon-outline"
+                    isSinhala={isSinhala}
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 6 }}>
+                  <DropdownSelect
+                    label={isSinhala ? 'හැදෑරීමේ මාදිලිය' : 'Study Mode'}
+                    placeholder={isSinhala ? 'සියලු මාදිලි' : 'All Modes'}
+                    selectedValue={selectedStudyMode}
+                    onSelect={setSelectedStudyMode}
+                    options={uovtStudyModeOptions}
+                    iconName="time-outline"
+                    isSinhala={isSinhala}
+                  />
+                </View>
+              </View>
 
-                {UOVT_CAMPUS_FILTERS.map((camp) => {
-                  const isSelected = selectedCampus === camp;
-                  return (
-                    <TouchableOpacity
-                      key={camp}
-                      style={[styles.districtPill, isSelected && styles.districtPillSelected]}
-                      onPress={() => setSelectedCampus(camp)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name="location-outline"
-                        size={12}
-                        color={isSelected ? COLORS.white : COLORS.secondaryText}
-                      />
-                      <Text
-                        style={[
-                          styles.districtPillText,
-                          isSelected && styles.districtPillTextSelected,
-                        ]}
-                      >
-                        {camp}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+              {/* Campus / Location Dropdown */}
+              <DropdownSelect
+                label={isSinhala ? 'මණ්ඩපය / විද්‍යාලය (Location)' : 'Campus / University College'}
+                placeholder={isSinhala ? 'සියලු ස්ථාන (Select Location)' : 'All Locations (Select Location)'}
+                selectedValue={selectedCampus}
+                onSelect={setSelectedCampus}
+                options={uovtCampusOptions}
+                iconName="business-outline"
+                isSinhala={isSinhala}
+              />
             </View>
 
             {/* Informational Guidance Notice on NVQ vs Degree Distinction */}
@@ -1089,6 +983,26 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     color: COLORS.darkNavy,
+  },
+  dropdownFiltersContainer: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    marginTop: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  dropdownTwoColRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
   },
   categoryFilterSection: {
     marginTop: 12,

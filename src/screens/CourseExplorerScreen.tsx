@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -18,58 +19,60 @@ import { FilterModal } from '../components/course/FilterModal';
 import { Course, QualificationLevel, StudyField, StudyMode } from '../types';
 import { CourseService, CourseFilterParams } from '../services/api';
 import { useTranslation } from '../context/LanguageContext';
+import { DropdownSelect, DropdownOption } from '../components/common/DropdownSelect';
 
 interface CourseExplorerScreenProps {
   navigation: any;
   route: any;
 }
 
-const QUALIFICATION_TYPES: (QualificationLevel | 'All')[] = [
-  'All',
-  'Degree',
-  'Higher Diploma',
-  'Diploma',
-  'Certificate',
+const INSTITUTION_OPTIONS: DropdownOption[] = [
+  { value: 'gov-inst-1', label: 'UoVT (Univ. of Vocational Technology)', labelSi: 'UoVT (වෘත්තීය තාක්ෂණ සරසවිය)' },
+  { value: 'gov-inst-3', label: 'SLIATE (Advanced Tech Education)', labelSi: 'SLIATE (උසස් තාක්ෂණ අධ්‍යාපනය)' },
+  { value: 'gov-inst-4', label: 'DTET (Technical Colleges)', labelSi: 'DTET (කාර්මික විද්‍යාල)' },
+  { value: 'gov-inst-5', label: 'VTA (Vocational Training Authority)', labelSi: 'VTA (වෘත්තීය පුහුණු අධිකාරිය)' },
+  { value: 'gov-inst-6', label: 'NVTI (Vocational Training Institutes)', labelSi: 'NVTI (ජාතික වෘත්තීය පුහුණු)' },
+  { value: 'gov-inst-7', label: 'NAITA (Apprentice & Industrial Training)', labelSi: 'NAITA (ආධුනිකත්ව සහ කාර්මික පුහුණු)' },
+  { value: 'gov-inst-9', label: 'CGTTI (German Tech Training Institute)', labelSi: 'CGTTI (ජර්මන් ටෙක්)' },
+  { value: 'gov-inst-10', label: 'NYSC (National Youth Services Council)', labelSi: 'NYSC (ජාතික තරුණ සේවා)' },
 ];
 
-const NVQ_FILTER_LEVELS = [
-  'All NVQ',
-  'NVQ Level 3',
-  'NVQ Level 4',
-  'NVQ Level 5',
-  'NVQ Level 6',
-  'NVQ Level 7',
+const QUALIFICATION_OPTIONS: DropdownOption[] = [
+  { value: 'Degree', label: 'Degree (Bachelor)', labelSi: 'උපාධි පාඨමාලා' },
+  { value: 'Higher Diploma', label: 'Higher Diploma (HND)', labelSi: 'උසස් ජාතික ඩිප්ලෝමා (HND)' },
+  { value: 'Diploma', label: 'Diploma (NVQ 5 / 6)', labelSi: 'ඩිප්ලෝමා පාඨමාලා' },
+  { value: 'Certificate', label: 'Certificate (NVQ 3 / 4)', labelSi: 'සහතික පත්‍ර පාඨමාලා' },
 ];
 
-const INSTITUTION_CHIPS = [
-  { label: 'All Institutes', id: 'All' },
-  { label: 'UoVT', id: 'gov-inst-1' },
-  { label: 'SLIATE', id: 'gov-inst-3' },
-  { label: 'DTET', id: 'gov-inst-4' },
-  { label: 'VTA', id: 'gov-inst-5' },
-  { label: 'NVTI', id: 'gov-inst-6' },
-  { label: 'NAITA', id: 'gov-inst-7' },
-  { label: 'CGTTI', id: 'gov-inst-9' },
-  { label: 'NYSC', id: 'gov-inst-10' },
+const NVQ_OPTIONS: DropdownOption[] = [
+  { value: 'NVQ Level 3', label: 'NVQ Level 3', labelSi: 'NVQ මට්ටම 3' },
+  { value: 'NVQ Level 4', label: 'NVQ Level 4', labelSi: 'NVQ මට්ටම 4' },
+  { value: 'NVQ Level 5', label: 'NVQ Level 5', labelSi: 'NVQ මට්ටම 5' },
+  { value: 'NVQ Level 6', label: 'NVQ Level 6', labelSi: 'NVQ මට්ටම 6' },
+  { value: 'NVQ Level 7', label: 'NVQ Level 7', labelSi: 'NVQ මට්ටම 7' },
 ];
 
 export const CourseExplorerScreen: React.FC<CourseExplorerScreenProps> = ({ navigation, route }) => {
   const { t, isSinhala } = useTranslation();
   const initialQuery = route.params?.initialQuery || '';
-  const initialLevel = route.params?.initialLevel || 'All';
-  const initialInstitutionId = route.params?.initialInstitutionId || 'All';
+  const initialLevel = route.params?.initialLevel && route.params.initialLevel !== 'All' ? route.params.initialLevel : null;
+  const initialInstitutionId = route.params?.initialInstitutionId && route.params.initialInstitutionId !== 'All' ? route.params.initialInstitutionId : null;
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [comparedCourseIds, setComparedCourseIds] = useState<string[]>([]);
-  const [selectedNVQLevel, setSelectedNVQLevel] = useState<string>('All NVQ');
+  
+  // No Auto-Fill: defaults to null
+  const [selectedInstitution, setSelectedInstitution] = useState<string | null>(initialInstitutionId);
+  const [selectedQualification, setSelectedQualification] = useState<string | null>(initialLevel);
+  const [selectedNVQLevel, setSelectedNVQLevel] = useState<string | null>(null);
 
   const [activeFilters, setActiveFilters] = useState<CourseFilterParams>({
     searchQuery: initialQuery,
-    level: initialLevel,
-    institutionId: initialInstitutionId,
+    level: initialLevel || 'All',
+    institutionId: initialInstitutionId || 'All',
     nvqLevel: 'All',
     field: 'All',
     mode: 'All',
@@ -80,7 +83,9 @@ export const CourseExplorerScreen: React.FC<CourseExplorerScreenProps> = ({ navi
     try {
       const data = await CourseService.getAllCourses({
         ...activeFilters,
-        nvqLevel: selectedNVQLevel === 'All NVQ' ? 'All' : selectedNVQLevel,
+        institutionId: selectedInstitution || 'All',
+        level: (selectedQualification as any) || 'All',
+        nvqLevel: selectedNVQLevel || 'All',
         searchQuery,
       });
       setCourses(data);
@@ -91,17 +96,11 @@ export const CourseExplorerScreen: React.FC<CourseExplorerScreenProps> = ({ navi
     }
   };
 
-  useEffect(() => {
-    loadCourses();
-  }, [searchQuery, activeFilters, selectedNVQLevel]);
-
-  const handleSelectQualification = (level: QualificationLevel | 'All') => {
-    setActiveFilters((prev) => ({ ...prev, level }));
-  };
-
-  const handleSelectInstitution = (instId: string) => {
-    setActiveFilters((prev) => ({ ...prev, institutionId: instId }));
-  };
+  useFocusEffect(
+    useCallback(() => {
+      loadCourses();
+    }, [searchQuery, selectedInstitution, selectedQualification, selectedNVQLevel, activeFilters.field, activeFilters.mode])
+  );
 
   const toggleCompare = (courseId: string) => {
     if (comparedCourseIds.includes(courseId)) {
@@ -120,11 +119,27 @@ export const CourseExplorerScreen: React.FC<CourseExplorerScreenProps> = ({ navi
   };
 
   const hasActiveFilters =
-    activeFilters.level !== 'All' ||
+    searchQuery.trim().length > 0 ||
+    selectedInstitution !== null ||
+    selectedQualification !== null ||
+    selectedNVQLevel !== null ||
     activeFilters.field !== 'All' ||
-    activeFilters.mode !== 'All' ||
-    activeFilters.institutionId !== 'All' ||
-    selectedNVQLevel !== 'All NVQ';
+    activeFilters.mode !== 'All';
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setSelectedInstitution(null);
+    setSelectedQualification(null);
+    setSelectedNVQLevel(null);
+    setActiveFilters({
+      searchQuery: '',
+      level: 'All',
+      institutionId: 'All',
+      nvqLevel: 'All',
+      field: 'All',
+      mode: 'All',
+    });
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -171,72 +186,60 @@ export const CourseExplorerScreen: React.FC<CourseExplorerScreenProps> = ({ navi
           </Text>
         </View>
 
-        {/* Filter Section */}
-        <View style={styles.filterSectionContainer}>
-          {/* Row 1: Qualification Filter Pills */}
-          <View style={styles.filterRowBlock}>
-            <Text style={styles.filterRowLabel}>Qualification</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-              {QUALIFICATION_TYPES.map((lvl) => {
-                const isSelected = activeFilters.level === lvl;
-                return (
-                  <TouchableOpacity
-                    key={lvl}
-                    onPress={() => handleSelectQualification(lvl)}
-                    style={[styles.quickPill, isSelected && styles.quickPillSelected]}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.quickPillText, isSelected && styles.quickPillTextSelected]}>
-                      {lvl === 'All' ? 'All Types' : lvl}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+        {/* Dropdown Filters (No Auto-Fill) */}
+        <View style={styles.dropdownFiltersContainer}>
+          <View style={styles.filterHeaderRow}>
+            <View style={styles.filterTitleRow}>
+              <Ionicons name="options-outline" size={16} color={COLORS.primaryPurple} />
+              <Text style={styles.filterSectionTitle}>
+                {isSinhala ? 'පාඨමාලා පෙරහන (Filter Courses)' : 'Filter All Courses'}
+              </Text>
+            </View>
+            {hasActiveFilters && (
+              <TouchableOpacity onPress={handleClearFilters} style={styles.clearBtn} activeOpacity={0.7}>
+                <Ionicons name="refresh" size={13} color={COLORS.danger} style={{ marginRight: 3 }} />
+                <Text style={styles.clearBtnText}>
+                  {isSinhala ? 'ඉවත් කරන්න' : 'Reset Filters'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* Row 2: NVQ Level Filter Pills */}
-          <View style={styles.filterRowBlock}>
-            <Text style={styles.filterRowLabel}>NVQ Level</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-              {NVQ_FILTER_LEVELS.map((nvq) => {
-                const isSelected = selectedNVQLevel === nvq;
-                return (
-                  <TouchableOpacity
-                    key={nvq}
-                    onPress={() => setSelectedNVQLevel(nvq)}
-                    style={[styles.nvqPill, isSelected && styles.nvqPillSelected]}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.nvqPillText, isSelected && styles.nvqPillTextSelected]}>
-                      {nvq}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
+          {/* Institution Dropdown */}
+          <DropdownSelect
+            label={isSinhala ? 'රාජ්‍ය ආයතනය (Institution)' : 'Government Institution'}
+            placeholder={isSinhala ? 'සියලු ආයතන (Select Institute)' : 'All Institutions (Select Institute)'}
+            selectedValue={selectedInstitution}
+            onSelect={setSelectedInstitution}
+            options={INSTITUTION_OPTIONS}
+            iconName="business-outline"
+            isSinhala={isSinhala}
+          />
 
-          {/* Row 3: Institution Filter Pills */}
-          <View style={[styles.filterRowBlock, { marginBottom: 4 }]}>
-            <Text style={styles.filterRowLabel}>Institute</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-              {INSTITUTION_CHIPS.map((chip) => {
-                const isSelected = activeFilters.institutionId === chip.id;
-                return (
-                  <TouchableOpacity
-                    key={chip.id}
-                    onPress={() => handleSelectInstitution(chip.id)}
-                    style={[styles.instChip, isSelected && styles.instChipSelected]}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.instChipText, isSelected && styles.instChipTextSelected]}>
-                      {chip.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+          {/* 2-Column: Qualification Type + NVQ Level */}
+          <View style={styles.dropdownTwoColRow}>
+            <View style={{ flex: 1, marginRight: 6 }}>
+              <DropdownSelect
+                label={isSinhala ? 'සුදුසුකම් වර්ගය' : 'Qualification'}
+                placeholder={isSinhala ? 'සියලු වර්ග' : 'All Qualifications'}
+                selectedValue={selectedQualification}
+                onSelect={setSelectedQualification}
+                options={QUALIFICATION_OPTIONS}
+                iconName="ribbon-outline"
+                isSinhala={isSinhala}
+              />
+            </View>
+            <View style={{ flex: 1, marginLeft: 6 }}>
+              <DropdownSelect
+                label={isSinhala ? 'NVQ මට්ටම' : 'NVQ Level'}
+                placeholder={isSinhala ? 'සියලු මට්ටම්' : 'All NVQ Levels'}
+                selectedValue={selectedNVQLevel}
+                onSelect={setSelectedNVQLevel}
+                options={NVQ_OPTIONS}
+                iconName="medal-outline"
+                isSinhala={isSinhala}
+              />
+            </View>
           </View>
         </View>
 
@@ -324,6 +327,52 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.primaryPurple,
     lineHeight: 15,
+  },
+  dropdownFiltersContainer: {
+    marginHorizontal: 16,
+    marginVertical: 10,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  filterHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  filterTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  filterSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.darkNavy,
+  },
+  clearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  clearBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.danger,
+  },
+  dropdownTwoColRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
   },
   filterSectionContainer: {
     backgroundColor: COLORS.white,

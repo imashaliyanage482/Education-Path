@@ -18,6 +18,7 @@ import { COLORS } from '../constants/colors';
 import { Header } from '../components/common/Header';
 import { Badge } from '../components/common/Badge';
 import { SLIATECourseCard } from '../components/sliate/SLIATECourseCard';
+import { DropdownSelect, DropdownOption } from '../components/common/DropdownSelect';
 import { useLiveCourses } from '../hooks/useLiveCourses';
 import { syncInstitutionCourses } from '../utils/liveDataSync';
 import {
@@ -41,11 +42,11 @@ export const SLIATECoursesScreen: React.FC<SLIATECoursesScreenProps> = ({ naviga
   // Active Tab: Programmes vs 19 ATIs
   const [activeTab, setActiveTab] = useState<'programmes' | 'atis'>('programmes');
 
-  // Search & Filter States
+  // Search & Filter States (Default to null - No Auto-Fill)
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<SLIATECategoryName | null>(null);
-  const [selectedStudyMode, setSelectedStudyMode] = useState<string>('All Modes');
-  const [selectedDistrict, setSelectedDistrict] = useState<string>('All Districts');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedStudyMode, setSelectedStudyMode] = useState<string | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
 
   // Details Modal State
   const [selectedProgramme, setSelectedProgramme] = useState<SLIATEProgramme | null>(null);
@@ -55,6 +56,34 @@ export const SLIATECoursesScreen: React.FC<SLIATECoursesScreenProps> = ({ naviga
     return syncInstitutionCourses('SLIATE', SLIATE_VERIFIED_PROGRAMMES, liveCourses);
   }, [liveCourses]);
 
+  // Dropdown Options strictly tailored for SLIATE
+  const sliateCategoryOptions: DropdownOption[] = useMemo(() => {
+    return SLIATE_CATEGORIES.map((cat) => ({
+      value: cat.name,
+      label: cat.name,
+      labelSi: cat.nameSi,
+    }));
+  }, []);
+
+  const sliateStudyModeOptions: DropdownOption[] = useMemo(() => {
+    return [
+      { value: 'Full-time', label: 'Full-time (Weekday)', labelSi: 'සම්පූර්ණ කාලීන (සතියේ දින)' },
+      { value: 'Part-time', label: 'Part-time (Weekend)', labelSi: 'අර්ධ කාලීන (සති අන්ත)' },
+    ];
+  }, []);
+
+  const sliateDistrictOptions: DropdownOption[] = useMemo(() => {
+    const set = new Set<string>();
+    SLIATE_ATIS.forEach((a) => {
+      if (a.district) set.add(a.district);
+    });
+    return Array.from(set).sort().map((d) => ({
+      value: d,
+      label: `${d} District (ATIs)`,
+      labelSi: `${d} දිස්ත්‍රික්කය`,
+    }));
+  }, []);
+
   // Filter logic across all verified programmes
   const filteredProgrammes = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -62,29 +91,31 @@ export const SLIATECoursesScreen: React.FC<SLIATECoursesScreenProps> = ({ naviga
       // 1. Search Query
       const matchesSearch =
         q.length === 0 ||
-        prog.name.toLowerCase().includes(q) ||
+        (prog.name && prog.name.toLowerCase().includes(q)) ||
         (prog.sinhalaName && prog.sinhalaName.toLowerCase().includes(q)) ||
-        prog.code.toLowerCase().includes(q) ||
-        prog.category.toLowerCase().includes(q) ||
-        prog.description.toLowerCase().includes(q);
+        (prog.code && prog.code.toLowerCase().includes(q)) ||
+        (prog.category && prog.category.toLowerCase().includes(q)) ||
+        (prog.description && prog.description.toLowerCase().includes(q));
 
       // 2. Category Filter
       const matchesCategory = selectedCategory ? prog.category === selectedCategory : true;
 
       // 3. Study Mode Filter
       let matchesMode = true;
-      if (selectedStudyMode !== 'All Modes') {
+      if (selectedStudyMode) {
+        const sm = prog.studyMode || 'Full-time';
         matchesMode =
-          prog.studyMode.includes('Both') ||
-          (selectedStudyMode.includes('Full-time') && prog.studyMode.includes('Full-time')) ||
-          (selectedStudyMode.includes('Part-time') && prog.studyMode.includes('Part-time'));
+          sm.includes('Both') ||
+          (selectedStudyMode.includes('Full-time') && sm.includes('Full-time')) ||
+          (selectedStudyMode.includes('Part-time') && sm.includes('Part-time'));
       }
 
       // 4. District Filter
       let matchesDistrict = true;
-      if (selectedDistrict !== 'All Districts') {
-        matchesDistrict = prog.availableATIs.some((atiName) =>
-          atiName.toLowerCase().includes(selectedDistrict.toLowerCase())
+      if (selectedDistrict) {
+        const atis = prog.availableATIs || [];
+        matchesDistrict = atis.some((atiName) =>
+          atiName && atiName.toLowerCase().includes(selectedDistrict.toLowerCase())
         );
       }
 
@@ -95,14 +126,14 @@ export const SLIATECoursesScreen: React.FC<SLIATECoursesScreenProps> = ({ naviga
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
     selectedCategory !== null ||
-    selectedStudyMode !== 'All Modes' ||
-    selectedDistrict !== 'All Districts';
+    selectedStudyMode !== null ||
+    selectedDistrict !== null;
 
   const handleClearFilters = () => {
     setSearchQuery('');
     setSelectedCategory(null);
-    setSelectedStudyMode('All Modes');
-    setSelectedDistrict('All Districts');
+    setSelectedStudyMode(null);
+    setSelectedDistrict(null);
   };
 
   // Distinct districts from ATIs
@@ -251,130 +282,61 @@ export const SLIATECoursesScreen: React.FC<SLIATECoursesScreenProps> = ({ naviga
               </View>
             </View>
 
-            {/* 4. Subject Categories Horizontal Filter */}
-            <View style={styles.categoryFilterSection}>
-              <Text style={styles.filterSectionTitle}>
-                {isSinhala ? 'පාඨමාලා ක්ෂේත්‍ර (Subject Category)' : 'Study Categories'}
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryPillsScroll}
-              >
-                <TouchableOpacity
-                  style={[styles.categoryPill, selectedCategory === null && styles.categoryPillActive]}
-                  onPress={() => setSelectedCategory(null)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name="grid-outline"
-                    size={14}
-                    color={selectedCategory === null ? COLORS.white : COLORS.primaryPurple}
-                  />
-                  <Text
-                    style={[
-                      styles.categoryPillText,
-                      selectedCategory === null && styles.categoryPillTextActive,
-                    ]}
-                  >
-                    {isSinhala ? 'සියලු ක්ෂේත්‍ර (7)' : 'All Categories (7)'}
-                  </Text>
-                </TouchableOpacity>
-
-                {SLIATE_CATEGORIES.map((cat) => {
-                  const isSelected = selectedCategory === cat.name;
-                  return (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[styles.categoryPill, isSelected && styles.categoryPillActive]}
-                      onPress={() => setSelectedCategory(isSelected ? null : cat.name)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={cat.icon as any}
-                        size={14}
-                        color={isSelected ? COLORS.white : COLORS.primaryPurple}
-                      />
-                      <Text
-                        style={[styles.categoryPillText, isSelected && styles.categoryPillTextActive]}
-                      >
-                        {isSinhala ? cat.nameSi : cat.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            {/* 5. Filters: Study Mode & District */}
-            <View style={styles.filterSection}>
+            {/* 4. SLIATE Dropdown Filters (No Auto-Fill, Strictly SLIATE-specific) */}
+            <View style={styles.dropdownFiltersContainer}>
               <View style={styles.filterHeaderRow}>
                 <View style={styles.filterTitleRow}>
-                  <Ionicons name="funnel-outline" size={16} color={COLORS.primaryPurple} />
-                  <Text style={styles.filterSubLabel}>
-                    {isSinhala ? 'පෙරහන් (Filters)' : 'Mode & District Filters'}
+                  <Ionicons name="options-outline" size={16} color={COLORS.primaryPurple} />
+                  <Text style={styles.filterSectionTitle}>
+                    {isSinhala ? 'SLIATE HND පාඨමාලා පෙරහන' : 'Filter SLIATE HND Programmes'}
                   </Text>
                 </View>
                 {hasActiveFilters && (
                   <TouchableOpacity onPress={handleClearFilters} style={styles.clearBtn} activeOpacity={0.7}>
-                    <Ionicons name="refresh" size={12} color={COLORS.danger} style={{ marginRight: 3 }} />
+                    <Ionicons name="refresh" size={13} color={COLORS.danger} style={{ marginRight: 3 }} />
                     <Text style={styles.clearBtnText}>
-                      {isSinhala ? 'ෆිල්ටර ඉවත් කරන්න' : 'Clear Filters'}
+                      {isSinhala ? 'ඉවත් කරන්න' : 'Reset Filters'}
                     </Text>
                   </TouchableOpacity>
                 )}
               </View>
 
-              {/* Study Mode Horizontal Selector */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.nvqScrollList}
-              >
-                {['All Modes', 'Full-time', 'Part-time'].map((mode) => {
-                  const isSelected = selectedStudyMode === mode;
-                  return (
-                    <TouchableOpacity
-                      key={mode}
-                      style={[styles.nvqPill, isSelected && styles.nvqPillSelected]}
-                      onPress={() => setSelectedStudyMode(mode)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.nvqPillText, isSelected && styles.nvqPillTextSelected]}>
-                        {mode}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+              {/* HND Category Dropdown */}
+              <DropdownSelect
+                label={isSinhala ? 'HND අධ්‍යයන ක්ෂේත්‍රය (Field)' : 'HND Field / Category'}
+                placeholder={isSinhala ? 'සියලු ක්ෂේත්‍ර (Select Field)' : 'All Fields (Select Field)'}
+                selectedValue={selectedCategory}
+                onSelect={setSelectedCategory}
+                options={sliateCategoryOptions}
+                iconName="school-outline"
+                isSinhala={isSinhala}
+              />
 
-              {/* District Horizontal Selector */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[styles.nvqScrollList, { marginTop: 8 }]}
-              >
-                {atiDistricts.map((dist) => {
-                  const isSelected = selectedDistrict === dist;
-                  return (
-                    <TouchableOpacity
-                      key={dist}
-                      style={[styles.districtPill, isSelected && styles.districtPillSelected]}
-                      onPress={() => setSelectedDistrict(dist)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name="location-outline"
-                        size={12}
-                        color={isSelected ? COLORS.white : COLORS.secondaryText}
-                      />
-                      <Text style={[styles.districtPillText, isSelected && styles.districtPillTextSelected]}>
-                        {dist}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+              {/* 2-Column: Study Mode + ATI District */}
+              <View style={styles.dropdownTwoColRow}>
+                <View style={{ flex: 1, marginRight: 6 }}>
+                  <DropdownSelect
+                    label={isSinhala ? 'හැදෑරීමේ මාදිලිය' : 'Study Mode'}
+                    placeholder={isSinhala ? 'සියලු මාදිලි' : 'All Modes'}
+                    selectedValue={selectedStudyMode}
+                    onSelect={setSelectedStudyMode}
+                    options={sliateStudyModeOptions}
+                    iconName="time-outline"
+                    isSinhala={isSinhala}
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 6 }}>
+                  <DropdownSelect
+                    label={isSinhala ? 'ATI දිස්ත්‍රික්කය' : 'ATI District'}
+                    placeholder={isSinhala ? 'සියලු දිස්ත්‍රික්ක' : 'All Districts'}
+                    selectedValue={selectedDistrict}
+                    onSelect={setSelectedDistrict}
+                    options={sliateDistrictOptions}
+                    iconName="location-outline"
+                    isSinhala={isSinhala}
+                  />
+                </View>
+              </View>
             </View>
 
             {/* 6. Filter Counter Bar */}
@@ -487,15 +449,6 @@ export const SLIATECoursesScreen: React.FC<SLIATECoursesScreenProps> = ({ naviga
 
                   {/* Actions */}
                   <View style={styles.atiActionsRow}>
-                    <TouchableOpacity
-                      style={styles.atiCallBtn}
-                      onPress={() => Linking.openURL(`tel:${ati.telephone.split('/')[0].trim()}`)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="call" size={13} color={COLORS.primaryPurple} />
-                      <Text style={styles.atiCallBtnText}>Call Institute</Text>
-                    </TouchableOpacity>
-
                     <TouchableOpacity
                       style={styles.atiApplyBtn}
                       onPress={() => Linking.openURL('https://apply.sliate.ac.lk/')}
@@ -876,6 +829,26 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     color: COLORS.darkNavy,
+  },
+  dropdownFiltersContainer: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    marginTop: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  dropdownTwoColRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
   },
   categoryFilterSection: {
     marginTop: 12,

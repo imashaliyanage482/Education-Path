@@ -112,16 +112,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   small: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
   },
   medium: {
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
   },
   large: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingVertical: 15,
+    paddingHorizontal: 26,
   },
   primaryContainer: {
     backgroundColor: COLORS.primaryPurple,

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -22,14 +23,53 @@ import GovernmentInstitutionsScreen from '../screens/GovernmentInstitutionsScree
 import CourseExplorerScreen from '../screens/CourseExplorerScreen';
 
 const Stack = createNativeStackNavigator();
+const NAV_STATE_KEY = 'EDUPATH_ACTIVE_SCREEN_STATE';
 
 export const AppNavigator = () => {
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const completed = window.localStorage.getItem('has_completed_onboarding');
+      const savedNav = window.sessionStorage.getItem(NAV_STATE_KEY);
+      if (completed === 'true' || savedNav) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const [isReady, setIsReady] = useState<boolean>(Platform.OS !== 'web');
+  const [initialState, setInitialState] = useState<any>();
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          const saved = window.sessionStorage.getItem(NAV_STATE_KEY);
+          if (saved) {
+            setInitialState(JSON.parse(saved));
+          }
+        }
+      } catch (err) {
+        console.warn('Navigation state restore skipped:', err);
+      } finally {
+        setIsReady(true);
+      }
+    }
+  }, []);
+
+  if (!isReady) {
+    return null;
+  }
 
   if (showOnboarding) {
     return (
       <OnboardingScreen
         onFinish={() => {
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            try {
+              window.localStorage.setItem('has_completed_onboarding', 'true');
+            } catch (e) {}
+          }
           setShowOnboarding(false);
         }}
       />
@@ -37,7 +77,16 @@ export const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      initialState={initialState}
+      onStateChange={(state) => {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          try {
+            window.sessionStorage.setItem(NAV_STATE_KEY, JSON.stringify(state));
+          } catch (e) {}
+        }
+      }}
+    >
       <Stack.Navigator
         initialRouteName="MainTabs"
         screenOptions={{

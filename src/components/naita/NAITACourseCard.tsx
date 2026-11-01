@@ -16,18 +16,22 @@ export const NAITACourseCard: React.FC<NAITACourseCardProps> = ({
   onPress,
   isSinhala = false,
 }) => {
-  const getNVQVariant = (level: string) => {
+  const getNVQVariant = (level?: string) => {
+    if (!level) return 'warning';
     if (level.includes('Level 6') || level.includes('Level 7')) return 'purple';
     if (level.includes('Level 5')) return 'blue';
     if (level.includes('Level 4')) return 'success';
     return 'warning';
   };
 
-  const getProviderVariant = (provider: string) => {
+  const getProviderVariant = (provider?: string) => {
+    if (!provider) return 'gray';
     if (provider.includes('AETI')) return 'purple';
     if (provider.includes('IETI')) return 'blue';
     return 'gray';
   };
+
+  const pType = course.providerType || 'Direct NAITA';
 
   return (
     <View style={styles.cardContainer}>
@@ -37,26 +41,26 @@ export const NAITACourseCard: React.FC<NAITACourseCardProps> = ({
           <View style={styles.imageContainer}>
             <Image source={{ uri: course.coverImage }} style={styles.image} resizeMode="cover" />
             <View style={styles.badgeOverlay}>
-              <Badge label={course.nvqLevel} variant={getNVQVariant(course.nvqLevel)} />
-              <Badge label={course.qualificationType} variant="blue" />
+              <Badge label={course.nvqLevel || 'NVQ Level 4'} variant={getNVQVariant(course.nvqLevel)} />
+              <Badge label={course.qualificationType || 'Certificate'} variant="blue" />
             </View>
             <View style={styles.providerOverlay}>
               <Badge
                 label={
-                  course.providerType.includes('AETI')
+                  pType.includes('AETI')
                     ? 'AETI (Japan Tech)'
-                    : course.providerType.includes('IETI')
+                    : pType.includes('IETI')
                     ? 'IETI (German Project)'
                     : 'NAITA District'
                 }
-                variant={getProviderVariant(course.providerType)}
+                variant={getProviderVariant(pType)}
               />
             </View>
           </View>
         ) : (
           <View style={styles.compactHeaderRow}>
-            <Badge label={course.nvqLevel} variant={getNVQVariant(course.nvqLevel)} />
-            <Badge label={course.qualificationType} variant="blue" />
+            <Badge label={course.nvqLevel || 'NVQ Level 4'} variant={getNVQVariant(course.nvqLevel)} />
+            <Badge label={course.qualificationType || 'Certificate'} variant="blue" />
           </View>
         )}
 
@@ -232,11 +236,11 @@ const styles = StyleSheet.create({
   detailsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     backgroundColor: COLORS.softLavender,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
   },
   detailsBtnText: {
     fontSize: 12,

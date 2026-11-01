@@ -18,6 +18,7 @@ import { COLORS } from '../constants/colors';
 import { Header } from '../components/common/Header';
 import { Badge } from '../components/common/Badge';
 import { CGTTICourseCard } from '../components/cgtti/CGTTICourseCard';
+import { DropdownSelect, DropdownOption } from '../components/common/DropdownSelect';
 import { useLiveCourses } from '../hooks/useLiveCourses';
 import { syncInstitutionCourses } from '../utils/liveDataSync';
 import {
@@ -41,14 +42,35 @@ export const CGTTICoursesScreen: React.FC<CGTTICoursesScreenProps> = ({ navigati
   // Active Tab: Courses vs Campuses
   const [activeTab, setActiveTab] = useState<'courses' | 'campuses'>('courses');
 
-  // Search & Filter States
+  // Search & Filter States (Default to null - No Auto-Fill)
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<CGTTICategoryName | null>(null);
-  const [selectedNVQLevel, setSelectedNVQLevel] = useState<string>('All Levels');
-  const [selectedBranch, setSelectedBranch] = useState<string>('All Campuses');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedNVQLevel, setSelectedNVQLevel] = useState<string | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
 
   // Details Modal State
   const [selectedCourse, setSelectedCourse] = useState<CGTTICourse | null>(null);
+
+  const cgttiCategoryOptions: DropdownOption[] = useMemo(() => {
+    return CGTTI_CATEGORIES.map((cat) => ({
+      value: cat.name,
+      label: cat.name,
+    }));
+  }, []);
+
+  const cgttiNvqOptions: DropdownOption[] = useMemo(() => {
+    return [
+      { value: 'NVQ Level 4', label: 'NVQ Level 4 (National Certificate)', labelSi: 'NVQ මට්ටම 4 (සහතිකය)' },
+      { value: 'NVQ Level 5', label: 'NVQ Level 5 (Specialized Diploma)', labelSi: 'NVQ මට්ටම 5 (ඩිප්ලෝමා)' },
+    ];
+  }, []);
+
+  const cgttiBranchOptions: DropdownOption[] = useMemo(() => {
+    return [
+      { value: 'Moratuwa', label: 'Moratuwa (Main Campus)', labelSi: 'මොරටුව (ප්‍රධාන මණ්ඩපය)' },
+      { value: 'Kilinochchi', label: 'Kilinochchi Branch', labelSi: 'කිලිනොච්චි ශාඛාව' },
+    ];
+  }, []);
 
   const liveCourses = useLiveCourses();
   const cgttiCourses = useMemo(() => {
@@ -62,30 +84,43 @@ export const CGTTICoursesScreen: React.FC<CGTTICoursesScreenProps> = ({ navigati
       // 1. Search Query
       const matchesSearch =
         q.length === 0 ||
-        course.name.toLowerCase().includes(q) ||
-        (course.sinhalaName && course.sinhalaName.toLowerCase().includes(q)) ||
-        course.code.toLowerCase().includes(q) ||
-        course.category.toLowerCase().includes(q) ||
-        course.description.toLowerCase().includes(q);
+        Boolean(course.name && course.name.toLowerCase().includes(q)) ||
+        Boolean(course.sinhalaName && course.sinhalaName.toLowerCase().includes(q)) ||
+        Boolean(course.code && course.code.toLowerCase().includes(q)) ||
+        Boolean(course.category && course.category.toLowerCase().includes(q)) ||
+        Boolean(course.description && course.description.toLowerCase().includes(q));
 
       // 2. Category Filter
       const matchesCategory = selectedCategory ? course.category === selectedCategory : true;
 
       // 3. NVQ Level Filter
       let matchesNVQ = true;
-      if (selectedNVQLevel !== 'All Levels') {
-        matchesNVQ = course.nvqLevel.includes(selectedNVQLevel);
+      if (selectedNVQLevel) {
+        matchesNVQ = Boolean(course.nvqLevel && course.nvqLevel.includes(selectedNVQLevel));
       }
 
       // 4. Branch Filter
       let matchesBranch = true;
-      if (selectedBranch !== 'All Campuses') {
-        matchesBranch = course.branches.some((b) => b.includes(selectedBranch));
+      if (selectedBranch) {
+        matchesBranch = Boolean(course.branches && course.branches.some((b) => b && b.includes(selectedBranch)));
       }
 
       return matchesSearch && matchesCategory && matchesNVQ && matchesBranch;
     });
   }, [cgttiCourses, searchQuery, selectedCategory, selectedNVQLevel, selectedBranch]);
+
+  const hasActiveFilters =
+    searchQuery.trim().length > 0 ||
+    selectedCategory !== null ||
+    selectedNVQLevel !== null ||
+    selectedBranch !== null;
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setSelectedCategory(null);
+    setSelectedNVQLevel(null);
+    setSelectedBranch(null);
+  };
 
   const handleOpenLink = (url: string) => {
     Linking.openURL(url).catch((err) => console.error('Failed opening url:', err));
@@ -215,107 +250,61 @@ export const CGTTICoursesScreen: React.FC<CGTTICoursesScreenProps> = ({ navigati
               </View>
             </View>
 
-            {/* Category Filter Chips */}
-            <View style={styles.filterSection}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryScroll}
-              >
-                <TouchableOpacity
-                  style={[
-                    styles.categoryChip,
-                    selectedCategory === null && styles.categoryChipActive,
-                  ]}
-                  onPress={() => setSelectedCategory(null)}
-                >
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      selectedCategory === null && styles.categoryChipTextActive,
-                    ]}
-                  >
-                    {isSinhala ? 'සියලු විෂය ක්ෂේත්‍ර' : 'All Categories'}
+            {/* CGTTI Dropdown Filters (No Auto-Fill, Strictly CGTTI-specific) */}
+            <View style={styles.dropdownFiltersContainer}>
+              <View style={styles.filterHeaderRow}>
+                <View style={styles.filterTitleRow}>
+                  <Ionicons name="options-outline" size={16} color={COLORS.primaryPurple} />
+                  <Text style={styles.filterSectionTitle}>
+                    {isSinhala ? 'ජර්මන් ටෙක් පාඨමාලා පෙරහන' : 'Filter CGTTI Courses'}
                   </Text>
-                </TouchableOpacity>
+                </View>
+                {hasActiveFilters && (
+                  <TouchableOpacity onPress={handleClearFilters} style={styles.clearBtn} activeOpacity={0.7}>
+                    <Ionicons name="refresh" size={13} color={COLORS.danger} style={{ marginRight: 3 }} />
+                    <Text style={styles.clearBtnText}>
+                      {isSinhala ? 'ඉවත් කරන්න' : 'Reset Filters'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
-                {CGTTI_CATEGORIES.map((cat) => {
-                  const isActive = selectedCategory === cat.name;
-                  return (
-                    <TouchableOpacity
-                      key={cat.name}
-                      style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-                      onPress={() => setSelectedCategory(isActive ? null : cat.name)}
-                    >
-                      <Ionicons
-                        name={cat.icon as any}
-                        size={14}
-                        color={isActive ? COLORS.white : '#B45309'}
-                        style={{ marginRight: 6 }}
-                      />
-                      <Text
-                        style={[
-                          styles.categoryChipText,
-                          isActive && styles.categoryChipTextActive,
-                        ]}
-                      >
-                        {cat.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
+              {/* Trade Sector Dropdown */}
+              <DropdownSelect
+                label={isSinhala ? 'වෘත්තීය ක්ෂේත්‍රය (Trade Sector)' : 'Trade Category'}
+                placeholder={isSinhala ? 'සියලු ක්ෂේත්‍ර (Select Sector)' : 'All Sectors (Select Sector)'}
+                selectedValue={selectedCategory}
+                onSelect={setSelectedCategory}
+                options={cgttiCategoryOptions}
+                iconName="construct-outline"
+                isSinhala={isSinhala}
+              />
 
-            {/* Secondary Filter Row: NVQ Level & Campus */}
-            <View style={styles.secondaryFilterRow}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {['All Levels', 'NVQ Level 4', 'NVQ Level 5'].map((lvl) => {
-                  const isActive = selectedNVQLevel === lvl;
-                  return (
-                    <TouchableOpacity
-                      key={lvl}
-                      style={[styles.smallFilterPill, isActive && styles.smallFilterPillActive]}
-                      onPress={() => setSelectedNVQLevel(lvl)}
-                    >
-                      <Text
-                        style={[
-                          styles.smallFilterPillText,
-                          isActive && styles.smallFilterPillTextActive,
-                        ]}
-                      >
-                        {lvl}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-
-                {['All Campuses', 'Moratuwa', 'Kilinochchi'].map((cmp) => {
-                  const isActive = selectedBranch === cmp;
-                  return (
-                    <TouchableOpacity
-                      key={cmp}
-                      style={[styles.smallFilterPill, isActive && styles.smallFilterPillActiveBlue]}
-                      onPress={() => setSelectedBranch(cmp)}
-                    >
-                      <Ionicons
-                        name="location-outline"
-                        size={12}
-                        color={isActive ? COLORS.white : COLORS.secondaryText}
-                        style={{ marginRight: 4 }}
-                      />
-                      <Text
-                        style={[
-                          styles.smallFilterPillText,
-                          isActive && styles.smallFilterPillTextActive,
-                        ]}
-                      >
-                        {cmp}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+              {/* 2-Column: NVQ Level + Campus Branch */}
+              <View style={styles.dropdownTwoColRow}>
+                <View style={{ flex: 1, marginRight: 6 }}>
+                  <DropdownSelect
+                    label={isSinhala ? 'NVQ මට්ටම' : 'NVQ Level'}
+                    placeholder={isSinhala ? 'සියලු මට්ටම්' : 'All Levels'}
+                    selectedValue={selectedNVQLevel}
+                    onSelect={setSelectedNVQLevel}
+                    options={cgttiNvqOptions}
+                    iconName="ribbon-outline"
+                    isSinhala={isSinhala}
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 6 }}>
+                  <DropdownSelect
+                    label={isSinhala ? 'මණ්ඩපය (Campus)' : 'Campus Branch'}
+                    placeholder={isSinhala ? 'සියලු මණ්ඩප' : 'All Campuses'}
+                    selectedValue={selectedBranch}
+                    onSelect={setSelectedBranch}
+                    options={cgttiBranchOptions}
+                    iconName="location-outline"
+                    isSinhala={isSinhala}
+                  />
+                </View>
+              </View>
             </View>
 
             {/* Course Cards List */}
@@ -574,14 +563,6 @@ export const CGTTICoursesScreen: React.FC<CGTTICoursesScreenProps> = ({ navigati
                   <Ionicons name="globe-outline" size={18} color={COLORS.white} />
                   <Text style={styles.primaryActionButtonText}>Visit Official CGTTI Admissions Portal</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.secondaryActionButton}
-                  onPress={() => handleCall(CGTTI_PROFILE.telephone)}
-                >
-                  <Ionicons name="call-outline" size={18} color="#B45309" />
-                  <Text style={styles.secondaryActionButtonText}>Call German Tech: 011-2605625</Text>
-                </TouchableOpacity>
               </View>
 
               <View style={{ height: 20 }} />
@@ -750,6 +731,53 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 13.5,
     color: COLORS.darkNavy,
+  },
+  dropdownFiltersContainer: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    marginTop: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  filterHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  filterTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  filterSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.darkNavy,
+  },
+  clearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  clearBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.danger,
+  },
+  dropdownTwoColRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
   },
   filterSection: {
     marginBottom: 10,

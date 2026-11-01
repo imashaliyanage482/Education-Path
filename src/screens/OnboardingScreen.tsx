@@ -36,7 +36,11 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish }) 
 
         {/* Welcome Text */}
         <View style={styles.textContainer}>
-          <Text style={styles.welcomeBigText}>Welcome,</Text>
+          <View style={styles.badgePill}>
+            <Ionicons name="sparkles" size={13} color={COLORS.primaryPurple} />
+            <Text style={styles.badgePillText}>DISCOVER YOUR CAREER PATH</Text>
+          </View>
+          <Text style={styles.welcomeBigText}>Welcome</Text>
           <Text style={styles.explorerSubText}>Future Explorer</Text>
           <Text style={styles.welcomeDescription}>
             Your journey begins here. Discover accredited degrees, diplomas, and technical career pathways tailored to your qualifications and future goals.
@@ -74,8 +78,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   imageCard: {
-    width: width - 36,
-    height: Math.min(height * 0.44, 380),
+    width: width - 32,
+    height: Math.min(height * 0.48, 410),
     borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: '#FAF5FF',
@@ -86,7 +90,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 18,
     elevation: 5,
-    marginBottom: 18,
+    marginBottom: 16,
   },
   heroImage: {
     width: '100%',
@@ -96,31 +100,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
   },
+  badgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  badgePillText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: COLORS.primaryPurple,
+    letterSpacing: 0.8,
+  },
   welcomeBigText: {
-    fontSize: 34,
+    fontSize: 38,
     fontWeight: '900',
-    color: COLORS.darkNavy,
+    color: '#1E1B4B',
     textAlign: 'center',
-    letterSpacing: -0.8,
-    lineHeight: 38,
+    letterSpacing: -1,
+    lineHeight: 42,
   },
   explorerSubText: {
-    fontSize: 21,
+    fontSize: 22,
     fontWeight: '800',
     color: COLORS.primaryPurple,
     textAlign: 'center',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
     marginTop: 2,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   welcomeDescription: {
-    fontSize: 13,
+    fontSize: 13.5,
     color: COLORS.secondaryText,
     textAlign: 'center',
-    lineHeight: 19,
-    marginTop: 4,
-    paddingHorizontal: 8,
+    lineHeight: 20,
+    marginTop: 2,
+    paddingHorizontal: 10,
+    fontWeight: '400',
   },
   footer: {
     paddingHorizontal: 24,
@@ -130,10 +153,11 @@ const styles = StyleSheet.create({
   getStartedBtn: {
     width: '100%',
     borderRadius: 16,
+    paddingVertical: 14,
     shadowColor: COLORS.primaryPurple,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
     elevation: 4,
   },
 });

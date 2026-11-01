@@ -113,6 +113,26 @@ export const QualificationCheckerScreen: React.FC<QualificationCheckerScreenProp
       />
 
       <ScrollView style={styles.container} contentContainerStyle={styles.contentPadding}>
+        {/* Banner: Match All Eligible Courses via Find My Path */}
+        <TouchableOpacity
+          style={styles.findPathBanner}
+          onPress={() => navigation.navigate('FindMyPath')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.findPathBannerIcon}>
+            <Ionicons name="sparkles" size={20} color={COLORS.primaryPurple} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.findPathBannerTitle}>
+              {isSinhala ? 'ඔබට සුදුසු සියලුම පාඨමාලා එකවර සොයන්න' : 'Find All Courses You Qualify For'}
+            </Text>
+            <Text style={styles.findPathBannerSubtitle}>
+              {isSinhala ? 'Find My Path හරහා NVQ, ඩිප්ලෝමා හා උපාධි පෙරහන් කරන්න' : 'Evaluate your results across all degrees, diplomas & NVQ'}
+            </Text>
+          </View>
+          <Ionicons name="arrow-forward" size={18} color={COLORS.primaryPurple} />
+        </TouchableOpacity>
+
         {/* Course Selector Dropdown Card */}
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>{t('selectCourseToCheck')}</Text>
@@ -391,6 +411,35 @@ const styles = StyleSheet.create({
   contentPadding: {
     padding: 20,
     gap: 16,
+  },
+  findPathBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF5FF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#E9D5FF',
+    gap: 12,
+  },
+  findPathBannerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  findPathBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.darkNavy,
+    marginBottom: 2,
+  },
+  findPathBannerSubtitle: {
+    fontSize: 11.5,
+    color: COLORS.secondaryText,
+    lineHeight: 16,
   },
   card: {
     backgroundColor: COLORS.white,

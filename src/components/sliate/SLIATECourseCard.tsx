@@ -26,11 +26,11 @@ export const SLIATECourseCard: React.FC<SLIATECourseCardProps> = ({
             <View style={styles.badgeOverlay}>
               <View style={styles.leftBadgesRow}>
                 <Badge label="HND Diploma" variant="purple" />
-                <Badge label={programme.studyMode} variant="blue" />
+                <Badge label={programme.studyMode || 'Full-time'} variant="blue" />
               </View>
               <View style={styles.rightTagBadge}>
                 <Text style={styles.rightTagText}>
-                  {programme.availableATIs.length} ATIs
+                  {programme.availableATIs ? programme.availableATIs.length : 19} ATIs
                 </Text>
               </View>
             </View>
@@ -39,11 +39,11 @@ export const SLIATECourseCard: React.FC<SLIATECourseCardProps> = ({
           <View style={styles.compactHeaderRow}>
             <View style={styles.leftBadgesRow}>
               <Badge label="HND Diploma" variant="purple" />
-              <Badge label={programme.studyMode} variant="blue" />
+              <Badge label={programme.studyMode || 'Full-time'} variant="blue" />
             </View>
             <View style={styles.rightTagBadge}>
               <Text style={styles.rightTagText}>
-                {programme.availableATIs.length} ATIs
+                {programme.availableATIs ? programme.availableATIs.length : 19} ATIs
               </Text>
             </View>
           </View>
@@ -257,10 +257,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.softLavender,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+    gap: 5,
   },
   detailsBtnText: {
     fontSize: 11.5,

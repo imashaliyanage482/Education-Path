@@ -28,6 +28,7 @@ import {
 } from '../data/vtaData';
 import { VTACourse, VTANVQLevel } from '../types';
 import { useTranslation } from '../context/LanguageContext';
+import { DropdownSelect, DropdownOption } from '../components/common/DropdownSelect';
 
 const { width } = Dimensions.get('window');
 
@@ -53,11 +54,11 @@ interface VTACoursesScreenProps {
 export const VTACoursesScreen: React.FC<VTACoursesScreenProps> = ({ navigation }) => {
   const { isSinhala } = useTranslation();
 
-  // Search & Filter States
+  // Search & Filter States - NO AUTO-FILL (Defaults to null)
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedNVQLevel, setSelectedNVQLevel] = useState<VTANVQLevel>('All Levels');
-  const [selectedDistrict, setSelectedDistrict] = useState<string>('All Districts');
+  const [selectedNVQLevel, setSelectedNVQLevel] = useState<string | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
 
   // Modal Details State
   const [selectedCourseDetails, setSelectedCourseDetails] = useState<VTACourse | null>(null);
@@ -78,6 +79,32 @@ export const VTACoursesScreen: React.FC<VTACoursesScreenProps> = ({ navigation }
     return syncInstitutionCourses('VTA', VTA_VERIFIED_COURSES, liveCourses);
   }, [liveCourses]);
 
+  // VTA Specific Dropdown Options
+  const vtaCategoryOptions: DropdownOption[] = useMemo(() => {
+    return VTA_CATEGORIES.map((cat) => ({
+      label: cat.name,
+      labelSi: cat.nameSi,
+      value: cat.name,
+      icon: cat.iconName,
+    }));
+  }, []);
+
+  const vtaNvqOptions: DropdownOption[] = useMemo(() => {
+    return VTA_NVQ_LEVELS.filter((l) => l !== 'All Levels').map((l) => ({
+      label: l,
+      value: l,
+      icon: 'ribbon-outline',
+    }));
+  }, []);
+
+  const vtaDistrictOptions: DropdownOption[] = useMemo(() => {
+    return DISTRICT_LIST.filter((d) => d !== 'All Districts').map((d) => ({
+      label: d,
+      value: d,
+      icon: 'location-outline',
+    }));
+  }, []);
+
   // Filter logic across all verified courses
   const filteredCourses = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -85,10 +112,10 @@ export const VTACoursesScreen: React.FC<VTACoursesScreenProps> = ({ navigation }
       // 1. Search Query
       const matchesSearch =
         q.length === 0 ||
-        course.name.toLowerCase().includes(q) ||
+        (course.name && course.name.toLowerCase().includes(q)) ||
         (course.sinhalaName && course.sinhalaName.toLowerCase().includes(q)) ||
         (course.code && course.code.toLowerCase().includes(q)) ||
-        course.category.toLowerCase().includes(q) ||
+        (course.category && course.category.toLowerCase().includes(q)) ||
         (course.trainingCentre && course.trainingCentre.toLowerCase().includes(q)) ||
         (course.description && course.description.toLowerCase().includes(q));
 
@@ -97,15 +124,15 @@ export const VTACoursesScreen: React.FC<VTACoursesScreenProps> = ({ navigation }
 
       // 3. Global NVQ Level Filter
       let matchesNVQ = true;
-      if (selectedNVQLevel !== 'All Levels') {
+      if (selectedNVQLevel) {
         matchesNVQ =
-          course.nvqLevel.includes(selectedNVQLevel) ||
+          (course.nvqLevel && course.nvqLevel.includes(selectedNVQLevel)) ||
           Boolean(course.supportedLevels && course.supportedLevels.includes(selectedNVQLevel));
       }
 
       // 4. District Filter
       let matchesDistrict = true;
-      if (selectedDistrict !== 'All Districts') {
+      if (selectedDistrict) {
         matchesDistrict = Boolean(
           course.district &&
             (course.district.includes(selectedDistrict) ||
@@ -121,14 +148,14 @@ export const VTACoursesScreen: React.FC<VTACoursesScreenProps> = ({ navigation }
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
     selectedCategory !== null ||
-    selectedNVQLevel !== 'All Levels' ||
-    selectedDistrict !== 'All Districts';
+    selectedNVQLevel !== null ||
+    selectedDistrict !== null;
 
   const handleClearFilters = () => {
     setSearchQuery('');
     setSelectedCategory(null);
-    setSelectedNVQLevel('All Levels');
-    setSelectedDistrict('All Districts');
+    setSelectedNVQLevel(null);
+    setSelectedDistrict(null);
   };
 
   // Active level detail derivation for the open modal
@@ -241,132 +268,61 @@ export const VTACoursesScreen: React.FC<VTACoursesScreenProps> = ({ navigation }
           </View>
         </View>
 
-        {/* 3. Trade Categories Horizontal Filter Bar */}
-        <View style={styles.categoryFilterSection}>
-          <Text style={styles.filterSectionTitle}>
-            {isSinhala ? 'ක්ෂේත්‍ර පෙරහන (Trade Sectors)' : 'Trade Sectors'}
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryPillsScroll}
-          >
-            {/* All Categories Option */}
-            <TouchableOpacity
-              style={[styles.categoryPill, selectedCategory === null && styles.categoryPillActive]}
-              onPress={() => setSelectedCategory(null)}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="grid-outline"
-                size={14}
-                color={selectedCategory === null ? COLORS.white : COLORS.primaryPurple}
-              />
-              <Text
-                style={[
-                  styles.categoryPillText,
-                  selectedCategory === null && styles.categoryPillTextActive,
-                ]}
-              >
-                {isSinhala ? 'සියලු ක්ෂේත්‍ර (8)' : 'All Sectors (8)'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* 8 VTA Categories */}
-            {VTA_CATEGORIES.map((cat) => {
-              const isSelected = selectedCategory === cat.name;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.categoryPill, isSelected && styles.categoryPillActive]}
-                  onPress={() => setSelectedCategory(isSelected ? null : cat.name)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name={cat.iconName as any}
-                    size={14}
-                    color={isSelected ? COLORS.white : COLORS.primaryPurple}
-                  />
-                  <Text
-                    style={[styles.categoryPillText, isSelected && styles.categoryPillTextActive]}
-                  >
-                    {isSinhala && cat.nameSi ? cat.nameSi : cat.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* 4. NVQ Level Filter Row (Label "Filter Courses by NVQ Level" REMOVED as requested) */}
-        <View style={styles.filterSection}>
+        {/* 3. VTA Dropdown Filters (No Auto-Fill, Sector + NVQ + District) */}
+        <View style={styles.dropdownFiltersContainer}>
           <View style={styles.filterHeaderRow}>
             <View style={styles.filterTitleRow}>
-              <Ionicons name="funnel-outline" size={16} color={COLORS.primaryPurple} />
-              <Text style={styles.filterSubLabel}>
-                {isSinhala ? 'මට්ටම් පෙරහන' : 'NVQ Level'}
+              <Ionicons name="options-outline" size={16} color={COLORS.primaryPurple} />
+              <Text style={styles.filterSectionTitle}>
+                {isSinhala ? 'VTA පාඨමාලා පෙරහන' : 'Filter VTA Courses'}
               </Text>
             </View>
             {hasActiveFilters && (
               <TouchableOpacity onPress={handleClearFilters} style={styles.clearBtn} activeOpacity={0.7}>
-                <Ionicons name="refresh" size={12} color={COLORS.danger} style={{ marginRight: 3 }} />
+                <Ionicons name="refresh" size={13} color={COLORS.danger} style={{ marginRight: 3 }} />
                 <Text style={styles.clearBtnText}>
-                  {isSinhala ? 'ෆිල්ටර ඉවත් කරන්න' : 'Clear Filters'}
+                  {isSinhala ? 'ඉවත් කරන්න' : 'Reset Filters'}
                 </Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {/* NVQ Horizontal Selector */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.nvqScrollList}
-          >
-            {VTA_NVQ_LEVELS.map((level) => {
-              const isSelected = selectedNVQLevel === level;
-              return (
-                <TouchableOpacity
-                  key={level}
-                  style={[styles.nvqPill, isSelected && styles.nvqPillSelected]}
-                  onPress={() => setSelectedNVQLevel(level)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.nvqPillText, isSelected && styles.nvqPillTextSelected]}>
-                    {level}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          {/* Trade Sector Dropdown */}
+          <DropdownSelect
+            label={isSinhala ? 'වෘත්තීය ක්ෂේත්‍රය (Trade Sector)' : 'Trade Sector'}
+            placeholder={isSinhala ? 'සියලු ක්ෂේත්‍ර (Select Sector)' : 'All Sectors (Select Sector)'}
+            selectedValue={selectedCategory}
+            onSelect={setSelectedCategory}
+            options={vtaCategoryOptions}
+            iconName="construct-outline"
+            isSinhala={isSinhala}
+          />
 
-          {/* District Horizontal Filter */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[styles.nvqScrollList, { marginTop: 8 }]}
-          >
-            {DISTRICT_LIST.map((dist) => {
-              const isSelected = selectedDistrict === dist;
-              return (
-                <TouchableOpacity
-                  key={dist}
-                  style={[styles.districtPill, isSelected && styles.districtPillSelected]}
-                  onPress={() => setSelectedDistrict(dist)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name="location-outline"
-                    size={12}
-                    color={isSelected ? COLORS.white : COLORS.secondaryText}
-                  />
-                  <Text style={[styles.districtPillText, isSelected && styles.districtPillTextSelected]}>
-                    {dist}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          {/* 2-Column: NVQ Level + District */}
+          <View style={styles.dropdownTwoColRow}>
+            <View style={{ flex: 1, marginRight: 6 }}>
+              <DropdownSelect
+                label={isSinhala ? 'NVQ මට්ටම' : 'NVQ Level'}
+                placeholder={isSinhala ? 'සියලු මට්ටම්' : 'All NVQ Levels'}
+                selectedValue={selectedNVQLevel}
+                onSelect={setSelectedNVQLevel}
+                options={vtaNvqOptions}
+                iconName="ribbon-outline"
+                isSinhala={isSinhala}
+              />
+            </View>
+            <View style={{ flex: 1, marginLeft: 6 }}>
+              <DropdownSelect
+                label={isSinhala ? 'දිස්ත්‍රික්කය' : 'District'}
+                placeholder={isSinhala ? 'සියලු දිස්ත්‍රික්ක' : 'All Districts'}
+                selectedValue={selectedDistrict}
+                onSelect={setSelectedDistrict}
+                options={vtaDistrictOptions}
+                iconName="location-outline"
+                isSinhala={isSinhala}
+              />
+            </View>
+          </View>
         </View>
 
         {/* 5. Filter Counter Bar */}
@@ -780,6 +736,26 @@ const styles = StyleSheet.create({
   categoryPillsScroll: {
     paddingHorizontal: 16,
     gap: 8,
+  },
+  dropdownFiltersContainer: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    marginTop: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  dropdownTwoColRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
   },
   categoryPill: {
     flexDirection: 'row',

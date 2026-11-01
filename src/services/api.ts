@@ -5,23 +5,29 @@ import { SAMPLE_COURSES } from '../data/sampleCourses';
 import { SAMPLE_INSTITUTIONS } from '../data/sampleInstitutions';
 import { SAMPLE_PATHWAYS } from '../data/samplePathways';
 import { NAITA_VERIFIED_COURSES } from '../data/naitaData';
+import { ALL_VERIFIED_UNIFIED_COURSES, cleanImageUrl } from '../data/allUnifiedCourses';
+import { markCourseAsDeleted, isCourseDeleted } from '../utils/liveDataSync';
 
 // Dynamic host determination: supports Android Studio Emulator, physical Expo Go devices over Wi-Fi, and Web/iOS
 const getBackendBaseUrl = (): string => {
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
+  if (Platform.OS === 'web') {
+    return 'http://localhost:5001/api';
+  }
   const hostUri = Constants.expoConfig?.hostUri || (Constants as any).manifest?.debuggerHost;
   if (hostUri) {
     const ip = hostUri.split(':')[0];
     if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
-      return `http://${ip}:5000/api`;
+      return `http://${ip}:5001/api`;
     }
   }
   if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5000/api';
+    // 192.168.221.143 connects physical devices on the same Wi-Fi. (Emulator can also use 10.0.2.2)
+    return 'http://192.168.221.143:5001/api';
   }
-  return 'http://localhost:5000/api';
+  return 'http://localhost:5001/api';
 };
 
 // Map NAITA course to unified Course type
@@ -69,7 +75,7 @@ const MAPPED_NAITA_COURSES: Course[] = NAITA_VERIFIED_COURSES.map((n: NAITACours
   isPopular: true,
 }));
 
-export const ALL_COMBINED_COURSES: Course[] = [...SAMPLE_COURSES, ...MAPPED_NAITA_COURSES];
+export const ALL_COMBINED_COURSES: Course[] = [...ALL_VERIFIED_UNIFIED_COURSES];
 
 // Environment variable or dynamic host fallback
 export const API_CONFIG = {
@@ -112,10 +118,12 @@ export const CourseService = {
         if (response.ok) {
           const data = await response.json();
           // Normalize MongoDB _id to id if necessary
-          const normalized = data.map((item: any) => ({
-            ...item,
-            id: item._id || item.id,
-          }));
+          const normalized = data
+            .map((item: any) => ({
+              ...item,
+              id: item._id || item.id,
+            }))
+            .filter((c: any) => !isCourseDeleted(c.id, c.name));
           return normalized;
         }
       } catch (error) {
@@ -209,20 +217,28 @@ export const CourseService = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_CONFIG.BASE_URL}/courses`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(courseData),
-    });
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/courses`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(courseData),
+      });
 
-    if (response.ok) {
-      const saved = await response.json();
-      const normalized = { ...saved, id: saved._id || saved.id };
-      ALL_COMBINED_COURSES.unshift(normalized);
-      return normalized;
-    } else {
-      const errRes = await response.json().catch(() => ({}));
-      throw new Error(errRes.error || errRes.details || `Failed to create course in database (Status: ${response.status})`);
+      if (response.ok) {
+        const saved = await response.json();
+        const normalized = { ...saved, id: saved._id || saved.id };
+        ALL_COMBINED_COURSES.unshift(normalized);
+        return normalized;
+      } else {
+        const errRes = await response.json().catch(() => ({}));
+        throw new Error(errRes.error || errRes.details || `Failed to create course in database (Status: ${response.status})`);
+      }
+    } catch (err: any) {
+      // Offline fallback: keep in local state for this session
+      const tempId = `local-course-${Date.now()}`;
+      const fallbackItem = { ...courseData, id: tempId } as Course;
+      ALL_COMBINED_COURSES.unshift(fallbackItem);
+      return fallbackItem;
     }
   },
 
@@ -234,21 +250,31 @@ export const CourseService = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_CONFIG.BASE_URL}/courses/${id}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(courseData),
-    });
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/courses/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(courseData),
+      });
 
-    if (response.ok) {
-      const saved = await response.json();
-      const normalized = { ...saved, id: saved._id || saved.id };
+      if (response.ok) {
+        const saved = await response.json();
+        const normalized = { ...saved, id: saved._id || saved.id };
+        const idx = ALL_COMBINED_COURSES.findIndex((c) => c.id === id);
+        if (idx !== -1) ALL_COMBINED_COURSES[idx] = normalized;
+        return normalized;
+      } else {
+        const errRes = await response.json().catch(() => ({}));
+        throw new Error(errRes.error || errRes.details || `Failed to update course in database (Status: ${response.status})`);
+      }
+    } catch (err: any) {
+      // Offline fallback: keep in local state for this session
       const idx = ALL_COMBINED_COURSES.findIndex((c) => c.id === id);
-      if (idx !== -1) ALL_COMBINED_COURSES[idx] = normalized;
-      return normalized;
-    } else {
-      const errRes = await response.json().catch(() => ({}));
-      throw new Error(errRes.error || errRes.details || `Failed to update course in database (Status: ${response.status})`);
+      if (idx !== -1) {
+        ALL_COMBINED_COURSES[idx] = { ...ALL_COMBINED_COURSES[idx], ...courseData } as Course;
+        return ALL_COMBINED_COURSES[idx];
+      }
+      throw err;
     }
   },
 
@@ -258,17 +284,31 @@ export const CourseService = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_CONFIG.BASE_URL}/courses/${id}`, {
-      method: 'DELETE',
-      headers,
-    });
-    if (response.ok) {
-      const idx = ALL_COMBINED_COURSES.findIndex((c) => c.id === id);
+    markCourseAsDeleted(id);
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/courses/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const removeLocal = () => {
+        markCourseAsDeleted(id);
+        const idx = ALL_COMBINED_COURSES.findIndex((c) => c.id === id || (c as any)._id === id);
+        if (idx !== -1) ALL_COMBINED_COURSES.splice(idx, 1);
+      };
+      if (response.ok) {
+        removeLocal();
+        return true;
+      } else {
+        removeLocal();
+        const errRes = await response.json().catch(() => ({}));
+        console.warn('Backend delete error:', errRes);
+        return true;
+      }
+    } catch (err) {
+      markCourseAsDeleted(id);
+      const idx = ALL_COMBINED_COURSES.findIndex((c) => c.id === id || (c as any)._id === id);
       if (idx !== -1) ALL_COMBINED_COURSES.splice(idx, 1);
       return true;
-    } else {
-      const errRes = await response.json().catch(() => ({}));
-      throw new Error(errRes.error || errRes.details || `Failed to delete course from database (Status: ${response.status})`);
     }
   },
 
@@ -326,20 +366,27 @@ export const InstitutionService = {
     };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`${API_CONFIG.BASE_URL}/institutions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(data),
-    });
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/institutions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      });
 
-    if (response.ok) {
-      const saved = await response.json();
-      const normalized = { ...saved, id: saved._id || saved.id };
-      localInstitutions.unshift(normalized);
-      return normalized;
-    } else {
-      const errRes = await response.json().catch(() => ({}));
-      throw new Error(errRes.error || errRes.details || `Failed to create institution in database (Status: ${response.status})`);
+      if (response.ok) {
+        const saved = await response.json();
+        const normalized = { ...saved, id: saved._id || saved.id };
+        localInstitutions.unshift(normalized);
+        return normalized;
+      } else {
+        const errRes = await response.json().catch(() => ({}));
+        throw new Error(errRes.error || errRes.details || `Failed to create institution in database (Status: ${response.status})`);
+      }
+    } catch (err: any) {
+      const tempId = `local-inst-${Date.now()}`;
+      const fallback = { ...data, id: tempId } as Institution;
+      localInstitutions.unshift(fallback);
+      return fallback;
     }
   },
 
@@ -349,21 +396,30 @@ export const InstitutionService = {
     };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`${API_CONFIG.BASE_URL}/institutions/${id}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(data),
-    });
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/institutions/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(data),
+      });
 
-    if (response.ok) {
-      const saved = await response.json();
-      const normalized = { ...saved, id: saved._id || saved.id };
+      if (response.ok) {
+        const saved = await response.json();
+        const normalized = { ...saved, id: saved._id || saved.id };
+        const idx = localInstitutions.findIndex((i) => i.id === id);
+        if (idx !== -1) localInstitutions[idx] = normalized;
+        return normalized;
+      } else {
+        const errRes = await response.json().catch(() => ({}));
+        throw new Error(errRes.error || errRes.details || `Failed to update institution in database (Status: ${response.status})`);
+      }
+    } catch (err: any) {
       const idx = localInstitutions.findIndex((i) => i.id === id);
-      if (idx !== -1) localInstitutions[idx] = normalized;
-      return normalized;
-    } else {
-      const errRes = await response.json().catch(() => ({}));
-      throw new Error(errRes.error || errRes.details || `Failed to update institution in database (Status: ${response.status})`);
+      if (idx !== -1) {
+        localInstitutions[idx] = { ...localInstitutions[idx], ...data } as Institution;
+        return localInstitutions[idx];
+      }
+      throw err;
     }
   },
 
@@ -371,17 +427,23 @@ export const InstitutionService = {
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`${API_CONFIG.BASE_URL}/institutions/${id}`, {
-      method: 'DELETE',
-      headers,
-    });
-    if (response.ok) {
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/institutions/${id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      if (response.ok) {
+        const idx = localInstitutions.findIndex((i) => i.id === id);
+        if (idx !== -1) localInstitutions.splice(idx, 1);
+        return true;
+      } else {
+        const errRes = await response.json().catch(() => ({}));
+        throw new Error(errRes.error || errRes.details || `Failed to delete institution from database (Status: ${response.status})`);
+      }
+    } catch (err) {
       const idx = localInstitutions.findIndex((i) => i.id === id);
       if (idx !== -1) localInstitutions.splice(idx, 1);
       return true;
-    } else {
-      const errRes = await response.json().catch(() => ({}));
-      throw new Error(errRes.error || errRes.details || `Failed to delete institution from database (Status: ${response.status})`);
     }
   },
 };

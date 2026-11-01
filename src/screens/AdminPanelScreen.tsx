@@ -29,6 +29,7 @@ import {
 } from '../types';
 import { CourseService, InstitutionService } from '../services/api';
 import { useAdminAuth } from '../context/AdminAuthContext';
+import { cleanImageUrl } from '../data/allUnifiedCourses';
 
 const { width } = Dimensions.get('window');
 
@@ -176,6 +177,18 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
 
   // Handle Logout
   const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' ? window.confirm('Are you sure you want to securely log out of the Administrator Panel?') : true;
+      if (confirmed) {
+        logout();
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainTabs' }],
+        });
+      }
+      return;
+    }
+
     Alert.alert(
       'Admin Logout',
       'Are you sure you want to securely log out of the Administrator Panel?',
@@ -267,27 +280,47 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
     }
   };
 
-  const handleDeleteInstitution = (id: string, name: string) => {
-    Alert.alert(
-      'Confirm Deletion',
-      `Are you sure you want to remove the institution "${name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await InstitutionService.deleteInstitution(id, token || undefined);
-              Alert.alert('Deleted', `Institution "${name}" removed.`);
-              loadData();
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete institution.');
-            }
+  const handleDeleteInstitution = async (id: string, name: string) => {
+    const executeDelete = async () => {
+      try {
+        setSubmitting(true);
+        await InstitutionService.deleteInstitution(id, token || undefined);
+        if (Platform.OS === 'web') {
+          window.alert(`Institution "${name}" deleted.`);
+        } else {
+          Alert.alert('Deleted', `Institution "${name}" removed.`);
+        }
+        await loadData();
+      } catch (err: any) {
+        if (Platform.OS === 'web') {
+          window.alert(err.message || 'Failed to delete institution.');
+        } else {
+          Alert.alert('Error', err.message || 'Failed to delete institution.');
+        }
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' ? window.confirm(`Are you sure you want to delete institution "${name}"?`) : true;
+      if (confirmed) {
+        await executeDelete();
+      }
+    } else {
+      Alert.alert(
+        'Confirm Deletion',
+        `Are you sure you want to remove the institution "${name}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: executeDelete,
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   // -------------------------------------------------------------------------
@@ -358,7 +391,7 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
         duration: courseDuration.trim(),
         studyMode: [courseStudyMode],
         teachingLanguage: ['English', 'Sinhala'],
-        coverImage: courseCoverImage.trim() || undefined,
+        coverImage: cleanImageUrl(courseCoverImage) || undefined,
         overview: courseOverview.trim() || `${courseName} offered by ${courseInstitutionName}.`,
         sinhalaOverview: courseSinhalaOverview.trim() || undefined,
         fees: {
@@ -394,27 +427,47 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
     }
   };
 
-  const handleDeleteCourse = (id: string, name: string) => {
-    Alert.alert(
-      'Confirm Deletion',
-      `Are you sure you want to delete course "${name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await CourseService.deleteCourse(id, token || undefined);
-              Alert.alert('Deleted', `Course "${name}" deleted.`);
-              loadData();
-            } catch (err) {
-              Alert.alert('Error', 'Failed to delete course.');
-            }
+  const handleDeleteCourse = async (id: string, name: string) => {
+    const executeDelete = async () => {
+      try {
+        setSubmitting(true);
+        await CourseService.deleteCourse(id, token || undefined);
+        if (Platform.OS === 'web') {
+          window.alert(`Course "${name}" deleted.`);
+        } else {
+          Alert.alert('Deleted', `Course "${name}" deleted.`);
+        }
+        await loadData();
+      } catch (err: any) {
+        if (Platform.OS === 'web') {
+          window.alert(err.message || 'Failed to delete course.');
+        } else {
+          Alert.alert('Error', err.message || 'Failed to delete course.');
+        }
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' ? window.confirm(`Are you sure you want to delete course "${name}"?`) : true;
+      if (confirmed) {
+        await executeDelete();
+      }
+    } else {
+      Alert.alert(
+        'Confirm Deletion',
+        `Are you sure you want to delete course "${name}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: executeDelete,
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   // Filtered lists
@@ -457,14 +510,25 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
             </View>
             <Text style={styles.adminEmailText}>Authorized Session • Chief Administrator</Text>
           </View>
-          <TouchableOpacity
-            style={styles.logoutBtn}
-            onPress={handleLogout}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="log-out-outline" size={16} color="#EF4444" />
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity
+              style={styles.viewAppBtn}
+              onPress={() => navigation.navigate('MainTabs')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="apps-outline" size={15} color={COLORS.white} />
+              <Text style={styles.viewAppText}>View App</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.logoutBtn}
+              onPress={handleLogout}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="log-out-outline" size={15} color="#EF4444" />
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Tab Selector: Only 2 Admin Features */}
@@ -595,7 +659,7 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
 
                       <TouchableOpacity
                         style={styles.deleteActionBtn}
-                        onPress={() => handleDeleteInstitution(inst.id, inst.name)}
+                        onPress={() => handleDeleteInstitution(inst.id || (inst as any)._id, inst.name)}
                       >
                         <Ionicons name="trash-outline" size={13} color="#EF4444" />
                         <Text style={styles.deleteActionText}>Delete</Text>
@@ -693,7 +757,7 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
 
                     <TouchableOpacity
                       style={styles.deleteActionBtn}
-                      onPress={() => handleDeleteCourse(c.id, c.name)}
+                      onPress={() => handleDeleteCourse(c.id || (c as any)._id, c.name)}
                     >
                       <Ionicons name="trash-outline" size={13} color="#EF4444" />
                       <Text style={styles.deleteActionText}>Delete</Text>
@@ -922,15 +986,19 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
                 <Text style={styles.formLabel}>Course Cover Image URL</Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="https://images.unsplash.com/..."
+                  placeholder="Paste image address (Unsplash, Direct URL, or Google image link)"
                   placeholderTextColor="#94A3B8"
                   value={courseCoverImage}
-                  onChangeText={setCourseCoverImage}
+                  onChangeText={(val) => setCourseCoverImage(cleanImageUrl(val) || val)}
                 />
                 {courseCoverImage.trim().length > 0 && (
                   <View style={styles.previewBox}>
                     <Text style={styles.previewLabel}>Cover Image Preview:</Text>
-                    <Image source={{ uri: courseCoverImage.trim() }} style={styles.previewCoverImage} resizeMode="cover" />
+                    <Image
+                      source={{ uri: cleanImageUrl(courseCoverImage) }}
+                      style={styles.previewCoverImage}
+                      resizeMode="cover"
+                    />
                   </View>
                 )}
               </View>
@@ -1197,19 +1265,33 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.secondaryText,
   },
+  viewAppBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primaryPurple,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 9,
+    gap: 4,
+  },
+  viewAppText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FEF2F2',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 9,
     borderWidth: 1,
     borderColor: '#FECACA',
     gap: 4,
   },
   logoutText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '700',
     color: '#EF4444',
   },
@@ -1413,13 +1495,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F5F3FF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 8,
     gap: 4,
   },
   editActionText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.primaryPurple,
   },
@@ -1427,13 +1509,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FEF2F2',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 8,
     gap: 4,
   },
   deleteActionText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '700',
     color: '#EF4444',
   },

@@ -14,6 +14,8 @@ interface CourseCardProps {
   isCompared?: boolean;
 }
 
+const DEFAULT_FALLBACK_COVER = 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&auto=format&fit=crop&q=80';
+
 export const CourseCard: React.FC<CourseCardProps> = ({
   course,
   onPress,
@@ -21,6 +23,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
   isCompared = false,
 }) => {
   const { t, isSinhala } = useTranslation();
+  const [imgFailed, setImgFailed] = React.useState(false);
 
   const displayName = isSinhala && course.sinhalaName ? course.sinhalaName : course.name;
 
@@ -30,7 +33,8 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         {/* Course Cover Image & Badges */}
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: course.coverImage }}
+            source={{ uri: !imgFailed && course.coverImage ? course.coverImage : DEFAULT_FALLBACK_COVER }}
+            onError={() => setImgFailed(true)}
             style={styles.image}
             resizeMode="cover"
           />
@@ -248,9 +252,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.softLavender,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 10,
+    gap: 4,
   },
   viewDetailsText: {
     fontSize: 12,

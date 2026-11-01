@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -70,18 +71,20 @@ export const FindMyPathScreen: React.FC<FindMyPathScreenProps> = ({ navigation }
 
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
-  const [resultFilterTab, setResultFilterTab] = useState<'ALL' | 'ELIGIBLE' | 'NOT_ELIGIBLE'>('ALL');
+  const [resultFilterTab, setResultFilterTab] = useState<'ALL' | 'ELIGIBLE' | 'NOT_ELIGIBLE'>('ELIGIBLE');
   const [liveCourses, setLiveCourses] = useState<Course[]>(SAMPLE_COURSES);
 
-  React.useEffect(() => {
-    let isMounted = true;
-    CourseService.getAllCourses().then((data) => {
-      if (data && data.length > 0 && isMounted) {
-        setLiveCourses(data);
-      }
-    }).catch(() => {});
-    return () => { isMounted = false; };
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      CourseService.getAllCourses().then((data) => {
+        if (data && data.length > 0 && isMounted) {
+          setLiveCourses(data);
+        }
+      }).catch(() => {});
+      return () => { isMounted = false; };
+    }, [])
+  );
 
   // Actual course fields matching EduPath catalog
   const FIELD_OPTIONS = [
@@ -356,6 +359,7 @@ export const FindMyPathScreen: React.FC<FindMyPathScreenProps> = ({ navigation }
     }
 
     setValidationError(null);
+    setResultFilterTab('ELIGIBLE');
     setIsSubmitted(true);
   };
 

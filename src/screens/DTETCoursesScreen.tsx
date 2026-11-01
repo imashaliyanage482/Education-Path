@@ -18,6 +18,7 @@ import { COLORS } from '../constants/colors';
 import { Header } from '../components/common/Header';
 import { Badge } from '../components/common/Badge';
 import { DTETCourseCard } from '../components/dtet/DTETCourseCard';
+import { DropdownSelect, DropdownOption } from '../components/common/DropdownSelect';
 import { useLiveCourses } from '../hooks/useLiveCourses';
 import { syncInstitutionCourses } from '../utils/liveDataSync';
 import {
@@ -41,21 +42,48 @@ export const DTETCoursesScreen: React.FC<DTETCoursesScreenProps> = ({ navigation
   // Active Tab: Courses vs Colleges
   const [activeTab, setActiveTab] = useState<'courses' | 'colleges'>('courses');
 
-  // Search & Filter States
+  // Search & Filter States (Default to null - No Auto-Fill)
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<DTETCategoryName | null>(null);
-  const [selectedNVQLevel, setSelectedNVQLevel] = useState<string>('All Levels');
-  const [selectedStudyMode, setSelectedStudyMode] = useState<string>('All Modes');
-  const [selectedDistrict, setSelectedDistrict] = useState<string>('All Districts');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedNVQLevel, setSelectedNVQLevel] = useState<string | null>(null);
+  const [selectedStudyMode, setSelectedStudyMode] = useState<string | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
 
   // Details Modal State
   const [selectedCourse, setSelectedCourse] = useState<DTETCourse | null>(null);
 
   // Distinct districts from Colleges
-  const collegeDistricts = useMemo(() => {
+  const dtetDistrictOptions: DropdownOption[] = useMemo(() => {
     const set = new Set<string>();
     DTET_COLLEGES.forEach((c) => set.add(c.district));
-    return ['All Districts', ...Array.from(set).sort()];
+    return Array.from(set).sort().map((d) => ({
+      value: d,
+      label: `${d} District (Colleges)`,
+      labelSi: `${d} දිස්ත්‍රික්කය`,
+    }));
+  }, []);
+
+  const dtetCategoryOptions: DropdownOption[] = useMemo(() => {
+    return DTET_CATEGORIES.map((cat) => ({
+      value: cat.name,
+      label: cat.name,
+      labelSi: cat.nameSi,
+    }));
+  }, []);
+
+  const dtetNvqOptions: DropdownOption[] = useMemo(() => {
+    return [
+      { value: 'NVQ Level 5', label: 'NVQ Level 5 (National Diploma)', labelSi: 'NVQ මට්ටම 5 (ඩිප්ලෝමා)' },
+      { value: 'NVQ Level 4', label: 'NVQ Level 4 (National Certificate)', labelSi: 'NVQ මට්ටම 4 (සහතිකය)' },
+      { value: 'NVQ Level 3', label: 'NVQ Level 3 (National Certificate)', labelSi: 'NVQ මට්ටම 3 (සහතිකය)' },
+    ];
+  }, []);
+
+  const dtetStudyModeOptions: DropdownOption[] = useMemo(() => {
+    return [
+      { value: 'Full-time', label: 'Full-time (Day)', labelSi: 'සම්පූර්ණ කාලීන (දිනපතා)' },
+      { value: 'Part-time', label: 'Part-time (Weekend/Evening)', labelSi: 'අර්ධ කාලීන (සති අන්ත/සවස)' },
+    ];
   }, []);
 
   const liveCourses = useLiveCourses();
@@ -70,38 +98,40 @@ export const DTETCoursesScreen: React.FC<DTETCoursesScreenProps> = ({ navigation
       // 1. Search Query
       const matchesSearch =
         q.length === 0 ||
-        course.name.toLowerCase().includes(q) ||
-        (course.sinhalaName && course.sinhalaName.toLowerCase().includes(q)) ||
-        course.code.toLowerCase().includes(q) ||
-        course.category.toLowerCase().includes(q) ||
-        course.description.toLowerCase().includes(q);
+        Boolean(course.name && course.name.toLowerCase().includes(q)) ||
+        Boolean(course.sinhalaName && course.sinhalaName.toLowerCase().includes(q)) ||
+        Boolean(course.code && course.code.toLowerCase().includes(q)) ||
+        Boolean(course.category && course.category.toLowerCase().includes(q)) ||
+        Boolean(course.description && course.description.toLowerCase().includes(q));
 
       // 2. Category Filter
       const matchesCategory = selectedCategory ? course.category === selectedCategory : true;
 
       // 3. NVQ Level Filter
       let matchesNVQ = true;
-      if (selectedNVQLevel !== 'All Levels') {
-        matchesNVQ = course.nvqLevel.includes(selectedNVQLevel);
+      if (selectedNVQLevel) {
+        matchesNVQ = Boolean(course.nvqLevel && course.nvqLevel.includes(selectedNVQLevel));
       }
 
       // 4. Study Mode Filter
       let matchesMode = true;
-      if (selectedStudyMode !== 'All Modes') {
+      if (selectedStudyMode) {
+        const sm = course.studyMode || 'Full-time';
         matchesMode =
-          course.studyMode.includes('Both') ||
-          (selectedStudyMode.includes('Full-time') && course.studyMode.includes('Full-time')) ||
-          (selectedStudyMode.includes('Part-time') && course.studyMode.includes('Part-time'));
+          sm.includes('Both') ||
+          (selectedStudyMode.includes('Full-time') && sm.includes('Full-time')) ||
+          (selectedStudyMode.includes('Part-time') && sm.includes('Part-time'));
       }
 
       // 5. District Filter
       let matchesDistrict = true;
-      if (selectedDistrict !== 'All Districts') {
+      if (selectedDistrict) {
+        const colleges = course.trainingColleges || [];
         matchesDistrict =
-          course.trainingColleges.some((colName) =>
-            colName.toLowerCase().includes(selectedDistrict.toLowerCase())
+          colleges.some((colName) =>
+            colName && colName.toLowerCase().includes(selectedDistrict.toLowerCase())
           ) ||
-          course.trainingColleges.includes('All 39 Technical Colleges and Colleges of Technology Island-wide');
+          colleges.some((colName) => colName && colName.toLowerCase().includes('all 39'));
       }
 
       return matchesSearch && matchesCategory && matchesNVQ && matchesMode && matchesDistrict;
@@ -111,16 +141,16 @@ export const DTETCoursesScreen: React.FC<DTETCoursesScreenProps> = ({ navigation
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
     selectedCategory !== null ||
-    selectedNVQLevel !== 'All Levels' ||
-    selectedStudyMode !== 'All Modes' ||
-    selectedDistrict !== 'All Districts';
+    selectedNVQLevel !== null ||
+    selectedStudyMode !== null ||
+    selectedDistrict !== null;
 
   const handleClearFilters = () => {
     setSearchQuery('');
     setSelectedCategory(null);
-    setSelectedNVQLevel('All Levels');
-    setSelectedStudyMode('All Modes');
-    setSelectedDistrict('All Districts');
+    setSelectedNVQLevel(null);
+    setSelectedStudyMode(null);
+    setSelectedDistrict(null);
   };
 
   return (
@@ -262,151 +292,72 @@ export const DTETCoursesScreen: React.FC<DTETCoursesScreenProps> = ({ navigation
               </View>
             </View>
 
-            {/* 4. Subject Categories Horizontal Filter */}
-            <View style={styles.categoryFilterSection}>
-              <Text style={styles.filterSectionTitle}>
-                {isSinhala ? 'පාඨමාලා ක්ෂේත්‍ර (Trade Sectors)' : 'Trade Categories'}
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryPillsScroll}
-              >
-                <TouchableOpacity
-                  style={[styles.categoryPill, selectedCategory === null && styles.categoryPillActive]}
-                  onPress={() => setSelectedCategory(null)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name="grid-outline"
-                    size={14}
-                    color={selectedCategory === null ? COLORS.white : COLORS.primaryPurple}
-                  />
-                  <Text
-                    style={[
-                      styles.categoryPillText,
-                      selectedCategory === null && styles.categoryPillTextActive,
-                    ]}
-                  >
-                    {isSinhala ? 'සියලු ක්ෂේත්‍ර (8)' : 'All Categories (8)'}
-                  </Text>
-                </TouchableOpacity>
-
-                {DTET_CATEGORIES.map((cat) => {
-                  const isSelected = selectedCategory === cat.name;
-                  return (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[styles.categoryPill, isSelected && styles.categoryPillActive]}
-                      onPress={() => setSelectedCategory(isSelected ? null : cat.name)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={cat.icon as any}
-                        size={14}
-                        color={isSelected ? COLORS.white : COLORS.primaryPurple}
-                      />
-                      <Text
-                        style={[styles.categoryPillText, isSelected && styles.categoryPillTextActive]}
-                      >
-                        {isSinhala ? cat.nameSi : cat.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            {/* 5. Filters: NVQ Level, Study Mode & District */}
-            <View style={styles.filterSection}>
+            {/* 4. DTET Dropdown Filters (No Auto-Fill, Strictly DTET-specific) */}
+            <View style={styles.dropdownFiltersContainer}>
               <View style={styles.filterHeaderRow}>
                 <View style={styles.filterTitleRow}>
-                  <Ionicons name="funnel-outline" size={16} color={COLORS.primaryPurple} />
-                  <Text style={styles.filterSubLabel}>
-                    {isSinhala ? 'NVQ මට්ටම් හා පෙරහන්' : 'NVQ Level & Mode Filters'}
+                  <Ionicons name="options-outline" size={16} color={COLORS.primaryPurple} />
+                  <Text style={styles.filterSectionTitle}>
+                    {isSinhala ? 'DTET කාර්මික පාඨමාලා පෙරහන' : 'Filter DTET Courses'}
                   </Text>
                 </View>
                 {hasActiveFilters && (
                   <TouchableOpacity onPress={handleClearFilters} style={styles.clearBtn} activeOpacity={0.7}>
-                    <Ionicons name="refresh" size={12} color={COLORS.danger} style={{ marginRight: 3 }} />
+                    <Ionicons name="refresh" size={13} color={COLORS.danger} style={{ marginRight: 3 }} />
                     <Text style={styles.clearBtnText}>
-                      {isSinhala ? 'ෆිල්ටර ඉවත් කරන්න' : 'Clear Filters'}
+                      {isSinhala ? 'ඉවත් කරන්න' : 'Reset Filters'}
                     </Text>
                   </TouchableOpacity>
                 )}
               </View>
 
-              {/* NVQ Horizontal Selector */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.nvqScrollList}
-              >
-                {['All Levels', 'NVQ Level 5', 'NVQ Level 4', 'NVQ Level 3'].map((lvl) => {
-                  const isSelected = selectedNVQLevel === lvl;
-                  return (
-                    <TouchableOpacity
-                      key={lvl}
-                      style={[styles.nvqPill, isSelected && styles.nvqPillSelected]}
-                      onPress={() => setSelectedNVQLevel(lvl)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.nvqPillText, isSelected && styles.nvqPillTextSelected]}>
-                        {lvl}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+              {/* Trade Sector Dropdown */}
+              <DropdownSelect
+                label={isSinhala ? 'වෘත්තීය ක්ෂේත්‍රය (Trade Sector)' : 'Trade Category'}
+                placeholder={isSinhala ? 'සියලු ක්ෂේත්‍ර (Select Sector)' : 'All Sectors (Select Sector)'}
+                selectedValue={selectedCategory}
+                onSelect={setSelectedCategory}
+                options={dtetCategoryOptions}
+                iconName="construct-outline"
+                isSinhala={isSinhala}
+              />
 
-              {/* Study Mode Selector */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[styles.nvqScrollList, { marginTop: 8 }]}
-              >
-                {['All Modes', 'Full-time (Day)', 'Part-time (Weekend)', 'Part-time (Evening)'].map((mode) => {
-                  const isSelected = selectedStudyMode === mode;
-                  return (
-                    <TouchableOpacity
-                      key={mode}
-                      style={[styles.districtPill, isSelected && styles.districtPillSelected]}
-                      onPress={() => setSelectedStudyMode(mode)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name="calendar-outline"
-                        size={12}
-                        color={isSelected ? COLORS.white : COLORS.secondaryText}
-                      />
-                      <Text style={[styles.districtPillText, isSelected && styles.districtPillTextSelected]}>
-                        {mode}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+              {/* 2-Column: NVQ Level + Study Mode */}
+              <View style={styles.dropdownTwoColRow}>
+                <View style={{ flex: 1, marginRight: 6 }}>
+                  <DropdownSelect
+                    label={isSinhala ? 'NVQ මට්ටම' : 'NVQ Level'}
+                    placeholder={isSinhala ? 'සියලු මට්ටම්' : 'All Levels'}
+                    selectedValue={selectedNVQLevel}
+                    onSelect={setSelectedNVQLevel}
+                    options={dtetNvqOptions}
+                    iconName="ribbon-outline"
+                    isSinhala={isSinhala}
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 6 }}>
+                  <DropdownSelect
+                    label={isSinhala ? 'හැදෑරීමේ මාදිලිය' : 'Study Mode'}
+                    placeholder={isSinhala ? 'සියලු මාදිලි' : 'All Modes'}
+                    selectedValue={selectedStudyMode}
+                    onSelect={setSelectedStudyMode}
+                    options={dtetStudyModeOptions}
+                    iconName="time-outline"
+                    isSinhala={isSinhala}
+                  />
+                </View>
+              </View>
 
-                {collegeDistricts.map((dist) => {
-                  const isSelected = selectedDistrict === dist;
-                  return (
-                    <TouchableOpacity
-                      key={dist}
-                      style={[styles.districtPill, isSelected && styles.districtPillSelected]}
-                      onPress={() => setSelectedDistrict(dist)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name="location-outline"
-                        size={12}
-                        color={isSelected ? COLORS.white : COLORS.secondaryText}
-                      />
-                      <Text style={[styles.districtPillText, isSelected && styles.districtPillTextSelected]}>
-                        {dist}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+              {/* College District Dropdown */}
+              <DropdownSelect
+                label={isSinhala ? 'විද්‍යාල දිස්ත්‍රික්කය' : 'College District'}
+                placeholder={isSinhala ? 'සියලු දිස්ත්‍රික්ක' : 'All Districts'}
+                selectedValue={selectedDistrict}
+                onSelect={setSelectedDistrict}
+                options={dtetDistrictOptions}
+                iconName="location-outline"
+                isSinhala={isSinhala}
+              />
             </View>
 
             {/* 6. Filter Counter Bar */}
@@ -534,15 +485,6 @@ export const DTETCoursesScreen: React.FC<DTETCoursesScreenProps> = ({ navigation
 
                   {/* Actions */}
                   <View style={styles.collegeActionsRow}>
-                    <TouchableOpacity
-                      style={styles.collegeCallBtn}
-                      onPress={() => Linking.openURL(`tel:${college.telephone.split('/')[0].trim()}`)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="call" size={13} color={COLORS.primaryPurple} />
-                      <Text style={styles.collegeCallBtnText}>Call College</Text>
-                    </TouchableOpacity>
-
                     <TouchableOpacity
                       style={styles.collegeApplyBtn}
                       onPress={() => Linking.openURL('https://mis.dtet.gov.lk/')}
@@ -908,6 +850,26 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     color: COLORS.darkNavy,
+  },
+  dropdownFiltersContainer: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    marginTop: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  dropdownTwoColRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
   },
   categoryFilterSection: {
     marginTop: 12,

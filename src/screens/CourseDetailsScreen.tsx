@@ -347,12 +347,6 @@ export const CourseDetailsScreen: React.FC<CourseDetailsScreenProps> = ({ naviga
         {institution && (
           <View style={styles.sectionCard}>
             <Text style={styles.sectionHeaderTitle}>{t('institutionContact')}</Text>
-            {institution.contactNumber ? (
-              <View style={styles.contactRow}>
-                <Ionicons name="call-outline" size={16} color={COLORS.secondaryText} />
-                <Text style={styles.contactText}>{institution.contactNumber}</Text>
-              </View>
-            ) : null}
             {institution.email ? (
               <View style={styles.contactRow}>
                 <Ionicons name="mail-outline" size={16} color={COLORS.secondaryText} />
