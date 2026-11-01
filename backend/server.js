@@ -13,6 +13,27 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Normalize Vercel serverless url rewrite if /server.js is passed
+app.use((req, res, next) => {
+  if (req.url.startsWith('/server.js')) {
+    req.url = req.url.replace('/server.js', '') || '/';
+  }
+  next();
+});
+
+// Root landing endpoint
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    app: 'EduPath API Server (Live on Vercel)',
+    endpoints: {
+      courses: '/api/courses',
+      institutions: '/api/institutions',
+      health: '/api/health',
+    },
+  });
+});
+
 // Routes
 app.use('/api/courses', require('./routes/courseRoutes'));
 app.use('/api/institutions', require('./routes/institutionRoutes'));
