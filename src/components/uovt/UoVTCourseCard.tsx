@@ -11,11 +11,14 @@ interface UoVTCourseCardProps {
   isSinhala?: boolean;
 }
 
+const LOCAL_FALLBACK = require('../../../assets/welcome_hero.png');
+
 export const UoVTCourseCard: React.FC<UoVTCourseCardProps> = ({
   programme,
   onPress,
   isSinhala,
 }) => {
+  const [imgFailed, setImgFailed] = React.useState(false);
   const getNVQVariant = (level: string) => {
     if (level.includes('Level 7') || level.includes('Degree')) {
       return 'purple';
@@ -33,23 +36,14 @@ export const UoVTCourseCard: React.FC<UoVTCourseCardProps> = ({
     <View style={styles.cardContainer}>
       <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={styles.cardTouch}>
         {/* Cover Image Banner */}
-        {programme.coverImage ? (
-          <View style={styles.imageContainer}>
-            <Image source={{ uri: programme.coverImage }} style={styles.image} resizeMode="cover" />
-            <View style={styles.badgeOverlay}>
-              <View style={styles.leftBadgesRow}>
-                <Badge label={programme.nvqLevel} variant={getNVQVariant(programme.nvqLevel)} />
-                <Badge label={programme.qualificationType || "Bachelor's Degree"} variant="blue" />
-              </View>
-              <View style={styles.rightTagBadge}>
-                <Text style={styles.rightTagText}>
-                  {programme.campus === 'Main Campus (Ratmalana)' ? 'UoVT Campus' : 'UoVT / UC'}
-                </Text>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.compactHeaderRow}>
+        <View style={styles.imageContainer}>
+          <Image
+            source={!imgFailed && programme.coverImage ? { uri: programme.coverImage } : LOCAL_FALLBACK}
+            onError={() => setImgFailed(true)}
+            style={styles.image}
+            resizeMode="cover"
+          />
+          <View style={styles.badgeOverlay}>
             <View style={styles.leftBadgesRow}>
               <Badge label={programme.nvqLevel} variant={getNVQVariant(programme.nvqLevel)} />
               <Badge label={programme.qualificationType || "Bachelor's Degree"} variant="blue" />
@@ -60,7 +54,7 @@ export const UoVTCourseCard: React.FC<UoVTCourseCardProps> = ({
               </Text>
             </View>
           </View>
-        )}
+        </View>
 
         <View style={styles.content}>
           {/* Category & Course Code */}

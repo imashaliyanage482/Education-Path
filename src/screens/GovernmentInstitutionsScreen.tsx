@@ -212,7 +212,7 @@ export const GovernmentInstitutionsScreen: React.FC<GovernmentInstitutionsScreen
           const isNYSC = inst.shortName === 'NYSC' || inst.id === 'gov-inst-10';
           const iconName = getInstitutionIcon(inst.shortName);
           const colorTheme = getCategoryColor(inst.category);
-          const logoSource = inst.logo ? { uri: inst.logo } : INSTITUTION_LOGOS[inst.shortName];
+          const logoSource = INSTITUTION_LOGOS[inst.shortName] || (inst.logo ? { uri: inst.logo } : null);
 
           const handlePress = () => {
             if (isUoVT) {

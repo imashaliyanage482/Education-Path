@@ -11,11 +11,14 @@ interface NAITACourseCardProps {
   isSinhala?: boolean;
 }
 
+const LOCAL_FALLBACK = require('../../../assets/welcome_hero.png');
+
 export const NAITACourseCard: React.FC<NAITACourseCardProps> = ({
   course,
   onPress,
   isSinhala = false,
 }) => {
+  const [imgFailed, setImgFailed] = React.useState(false);
   const getNVQVariant = (level?: string) => {
     if (!level) return 'warning';
     if (level.includes('Level 6') || level.includes('Level 7')) return 'purple';
@@ -37,32 +40,30 @@ export const NAITACourseCard: React.FC<NAITACourseCardProps> = ({
     <View style={styles.cardContainer}>
       <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={styles.cardTouch}>
         {/* Course Cover Image */}
-        {course.coverImage ? (
-          <View style={styles.imageContainer}>
-            <Image source={{ uri: course.coverImage }} style={styles.image} resizeMode="cover" />
-            <View style={styles.badgeOverlay}>
-              <Badge label={course.nvqLevel || 'NVQ Level 4'} variant={getNVQVariant(course.nvqLevel)} />
-              <Badge label={course.qualificationType || 'Certificate'} variant="blue" />
-            </View>
-            <View style={styles.providerOverlay}>
-              <Badge
-                label={
-                  pType.includes('AETI')
-                    ? 'AETI (Japan Tech)'
-                    : pType.includes('IETI')
-                    ? 'IETI (German Project)'
-                    : 'NAITA District'
-                }
-                variant={getProviderVariant(pType)}
-              />
-            </View>
-          </View>
-        ) : (
-          <View style={styles.compactHeaderRow}>
+        <View style={styles.imageContainer}>
+          <Image
+            source={!imgFailed && course.coverImage ? { uri: course.coverImage } : LOCAL_FALLBACK}
+            onError={() => setImgFailed(true)}
+            style={styles.image}
+            resizeMode="cover"
+          />
+          <View style={styles.badgeOverlay}>
             <Badge label={course.nvqLevel || 'NVQ Level 4'} variant={getNVQVariant(course.nvqLevel)} />
             <Badge label={course.qualificationType || 'Certificate'} variant="blue" />
           </View>
-        )}
+          <View style={styles.providerOverlay}>
+            <Badge
+              label={
+                pType.includes('AETI')
+                  ? 'AETI (Japan Tech)'
+                  : pType.includes('IETI')
+                  ? 'IETI (German Project)'
+                  : 'NAITA District'
+              }
+              variant={getProviderVariant(pType)}
+            />
+          </View>
+        </View>
 
         <View style={styles.content}>
           <View style={styles.categoryRow}>

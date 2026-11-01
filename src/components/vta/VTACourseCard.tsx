@@ -11,7 +11,10 @@ interface VTACourseCardProps {
   isSinhala?: boolean;
 }
 
+const LOCAL_FALLBACK = require('../../../assets/welcome_hero.png');
+
 export const VTACourseCard: React.FC<VTACourseCardProps> = ({ course, onPress, isSinhala }) => {
+  const [imgFailed, setImgFailed] = React.useState(false);
   const getNVQVariant = (level: string) => {
     if (level.includes('Level 5') || level.includes('Level 6') || level.includes('Level 7') || level.includes('Diploma')) {
       return 'purple';
@@ -26,21 +29,14 @@ export const VTACourseCard: React.FC<VTACourseCardProps> = ({ course, onPress, i
     <View style={styles.cardContainer}>
       <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={styles.cardTouch}>
         {/* Course Cover Image */}
-        {course.coverImage ? (
-          <View style={styles.imageContainer}>
-            <Image source={{ uri: course.coverImage }} style={styles.image} resizeMode="cover" />
-            <View style={styles.badgeOverlay}>
-              <View style={styles.leftBadgesRow}>
-                <Badge label={course.nvqLevel} variant={getNVQVariant(course.nvqLevel)} />
-                <Badge label={course.qualificationType || 'Vocational'} variant="blue" />
-              </View>
-              <View style={styles.rightTagBadge}>
-                <Text style={styles.rightTagText}>VTA District</Text>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.compactHeaderRow}>
+        <View style={styles.imageContainer}>
+          <Image
+            source={!imgFailed && course.coverImage ? { uri: course.coverImage } : LOCAL_FALLBACK}
+            onError={() => setImgFailed(true)}
+            style={styles.image}
+            resizeMode="cover"
+          />
+          <View style={styles.badgeOverlay}>
             <View style={styles.leftBadgesRow}>
               <Badge label={course.nvqLevel} variant={getNVQVariant(course.nvqLevel)} />
               <Badge label={course.qualificationType || 'Vocational'} variant="blue" />
@@ -49,7 +45,7 @@ export const VTACourseCard: React.FC<VTACourseCardProps> = ({ course, onPress, i
               <Text style={styles.rightTagText}>VTA District</Text>
             </View>
           </View>
-        )}
+        </View>
 
         <View style={styles.content}>
           {/* Category & Course Code */}

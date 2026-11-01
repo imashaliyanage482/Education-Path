@@ -14,7 +14,7 @@ interface CourseCardProps {
   isCompared?: boolean;
 }
 
-const DEFAULT_FALLBACK_COVER = 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&auto=format&fit=crop&q=80';
+const LOCAL_FALLBACK_IMAGE = require('../../../assets/welcome_hero.png');
 
 export const CourseCard: React.FC<CourseCardProps> = ({
   course,
@@ -33,7 +33,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         {/* Course Cover Image & Badges */}
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: !imgFailed && course.coverImage ? course.coverImage : DEFAULT_FALLBACK_COVER }}
+            source={!imgFailed && course.coverImage ? { uri: course.coverImage } : LOCAL_FALLBACK_IMAGE}
             onError={() => setImgFailed(true)}
             style={styles.image}
             resizeMode="cover"

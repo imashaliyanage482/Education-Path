@@ -25,6 +25,8 @@ interface CourseDetailsScreenProps {
   route: any;
 }
 
+const LOCAL_FALLBACK_COVER = require('../../assets/welcome_hero.png');
+
 export const CourseDetailsScreen: React.FC<CourseDetailsScreenProps> = ({ navigation, route }) => {
   const { t, isSinhala } = useTranslation();
   const { courseId } = route.params || {};
@@ -36,6 +38,8 @@ export const CourseDetailsScreen: React.FC<CourseDetailsScreenProps> = ({ naviga
 
   const [course, setCourse] = useState<Course>(initialCourse);
   const [institution, setInstitution] = useState<Institution | undefined>();
+  const [coverFailed, setCoverFailed] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -107,7 +111,12 @@ export const CourseDetailsScreen: React.FC<CourseDetailsScreenProps> = ({ naviga
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Banner Cover Image */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri: course.coverImage }} style={styles.coverImage} resizeMode="cover" />
+          <Image
+            source={!coverFailed && course.coverImage ? { uri: course.coverImage } : LOCAL_FALLBACK_COVER}
+            onError={() => setCoverFailed(true)}
+            style={styles.coverImage}
+            resizeMode="cover"
+          />
           <View style={styles.imageOverlay} />
           <View style={styles.badgeOverlay}>
             <Badge label={course.qualificationType} variant="purple" />
@@ -121,8 +130,12 @@ export const CourseDetailsScreen: React.FC<CourseDetailsScreenProps> = ({ naviga
         {/* Institution Logo & Basic Information */}
         <View style={styles.headerInfoCard}>
           <View style={styles.instRow}>
-            {institution?.logo ? (
-              <Image source={{ uri: institution.logo }} style={styles.instLogo} />
+            {institution?.logo && !logoFailed ? (
+              <Image
+                source={{ uri: institution.logo }}
+                onError={() => setLogoFailed(true)}
+                style={styles.instLogo}
+              />
             ) : (
               <View style={[styles.instLogo, { backgroundColor: COLORS.softLavender, alignItems: 'center', justifyContent: 'center' }]}>
                 <Ionicons name="school" size={20} color={COLORS.primaryPurple} />

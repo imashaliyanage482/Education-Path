@@ -2,7 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../components/common/AppIcon';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../context/LanguageContext';
 
@@ -58,7 +58,7 @@ export const TabNavigator = () => {
           marginTop: 2,
         },
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap = 'home';
+          let iconName = 'home';
 
           if (route.name === 'HomeTab') {
             iconName = focused ? 'home' : 'home-outline';
@@ -70,7 +70,7 @@ export const TabNavigator = () => {
 
           return (
             <View style={focused ? styles.activeIconWrapper : undefined}>
-              <Ionicons name={iconName} size={22} color={color} />
+              <AppIcon name={iconName} size={22} color={color} />
             </View>
           );
         },

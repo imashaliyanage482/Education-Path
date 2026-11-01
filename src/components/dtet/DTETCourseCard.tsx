@@ -11,11 +11,14 @@ interface DTETCourseCardProps {
   isSinhala?: boolean;
 }
 
+const LOCAL_FALLBACK = require('../../../assets/welcome_hero.png');
+
 export const DTETCourseCard: React.FC<DTETCourseCardProps> = ({
   course,
   onPress,
   isSinhala,
 }) => {
+  const [imgFailed, setImgFailed] = React.useState(false);
   const getNVQVariant = (level: string) => {
     if (level.includes('Level 5') || level.includes('Level 6')) {
       return 'purple';
@@ -30,21 +33,14 @@ export const DTETCourseCard: React.FC<DTETCourseCardProps> = ({
     <View style={styles.cardContainer}>
       <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={styles.cardTouch}>
         {/* Cover Image Banner */}
-        {course.coverImage ? (
-          <View style={styles.imageContainer}>
-            <Image source={{ uri: course.coverImage }} style={styles.image} resizeMode="cover" />
-            <View style={styles.badgeOverlay}>
-              <View style={styles.leftBadgesRow}>
-                <Badge label={course.nvqLevel} variant={getNVQVariant(course.nvqLevel)} />
-                <Badge label={course.qualificationType} variant="blue" />
-              </View>
-              <View style={styles.rightTagBadge}>
-                <Text style={styles.rightTagText}>DTET Network</Text>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.compactHeaderRow}>
+        <View style={styles.imageContainer}>
+          <Image
+            source={!imgFailed && course.coverImage ? { uri: course.coverImage } : LOCAL_FALLBACK}
+            onError={() => setImgFailed(true)}
+            style={styles.image}
+            resizeMode="cover"
+          />
+          <View style={styles.badgeOverlay}>
             <View style={styles.leftBadgesRow}>
               <Badge label={course.nvqLevel} variant={getNVQVariant(course.nvqLevel)} />
               <Badge label={course.qualificationType} variant="blue" />
@@ -53,7 +49,7 @@ export const DTETCourseCard: React.FC<DTETCourseCardProps> = ({
               <Text style={styles.rightTagText}>DTET Network</Text>
             </View>
           </View>
-        )}
+        </View>
 
         <View style={styles.content}>
           {/* Category & Course Code */}
