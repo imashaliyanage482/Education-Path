@@ -13,11 +13,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Normalize Vercel serverless url rewrite if /server.js is passed
+// Normalize Vercel serverless url rewrite if /server.js or /backend/server.js is passed
 app.use((req, res, next) => {
-  if (req.url.startsWith('/server.js')) {
-    req.url = req.url.replace('/server.js', '') || '/';
-  }
+  req.url = req.url.replace(/^\/(backend\/)?server(\.js)?/, '') || '/';
   next();
 });
 
@@ -167,6 +165,11 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     time: new Date().toISOString(),
   });
+});
+
+// Catch-all for unknown routes
+app.use((req, res) => {
+  res.redirect('/');
 });
 
 const PORT = process.env.PORT || 5000;
